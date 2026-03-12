@@ -27,6 +27,7 @@ jobs:
         run: dotnet restore src/FigmaSearch/FigmaSearch.csproj
 
       - name: Build & Publish
+        shell: bash
         run: |
           dotnet publish src/FigmaSearch/FigmaSearch.csproj \
             -c Release \
@@ -40,6 +41,7 @@ jobs:
         run: choco install nsis -y
 
       - name: Create dist folder
+        shell: bash
         run: mkdir -p installer/dist
 
       - name: Build NSIS installer
