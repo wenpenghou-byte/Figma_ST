@@ -1,0 +1,63 @@
+<Window x:Class="FigmaSearch.Windows.SearchWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctrl="clr-namespace:FigmaSearch.Controls"
+        Title="FigmaSearch" WindowStyle="None" AllowsTransparency="True"
+        Background="Transparent" ResizeMode="NoResize"
+        ShowInTaskbar="False" Topmost="True"
+        Width="640" SizeToContent="Height"
+        WindowStartupLocation="Manual"
+        Deactivated="Window_Deactivated" KeyDown="Window_KeyDown">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
+    </Window.Resources>
+    <Border Background="{StaticResource BgPrimary}"
+            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="12">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="30" ShadowDepth="8" Color="#000000" Opacity="0.6" Direction="270"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="56"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="14,0,14,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="&#128269;" VerticalAlignment="Center" Margin="0,0,8,0" FontSize="16" Opacity="0.5"/>
+                <TextBox x:Name="SearchBox" Grid.Column="1" Style="{StaticResource SearchBoxWithHint}"
+                         Background="Transparent" TextChanged="SearchBox_TextChanged"/>
+                <Button x:Name="UpdateBtn" Grid.Column="2" Style="{StaticResource UpdateButton}"
+                        Visibility="Collapsed" Click="UpdateBtn_Click" Margin="8,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#26356;&#26032; "/>
+                        <Border Background="#E53935" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
+                            <TextBlock Text="NEW" FontSize="9" Foreground="White" FontWeight="Bold"/>
+                        </Border>
+                    </StackPanel>
+                </Button>
+            </Grid>
+            <Border x:Name="ApiErrorBar" Grid.Row="1" Background="#7B1515" Visibility="Collapsed" Padding="14,7">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="API Key &#24050;&#22833;&#25928;&#65292;&#35831;&#26356;&#26032;&#21518;&#37325;&#35797;" Foreground="#FFCCCC" VerticalAlignment="Center" FontSize="12"/>
+                    <Button Grid.Column="1" Content="&#21069;&#24448;&#35774;&#32622;" Style="{StaticResource FlatButton}" Foreground="#FF8A80" Click="ApiErrorGotoSettings_Click"/>
+                </Grid>
+            </Border>
+            <Border x:Name="ResultsArea" Grid.Row="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Visibility="Collapsed">
+                <ScrollViewer x:Name="ResultsScroll" MaxHeight="520"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              PreviewMouseWheel="ResultsScroll_PreviewMouseWheel">
+                    <StackPanel x:Name="ResultsPanel" Margin="0,6,0,8"/>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

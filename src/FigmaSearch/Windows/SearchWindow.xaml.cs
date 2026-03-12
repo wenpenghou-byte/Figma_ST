@@ -1,0 +1,190 @@
+using FigmaSearch.Models;
+using FigmaSearch.Services;
+using FigmaSearch.ViewModels;
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+
+namespace FigmaSearch.Windows;
+
+public partial class SearchWindow : Window
+{
+    private readonly SearchViewModel _vm;
+    private UpdateInfo? _pendingUpdate;
+
+    public SearchWindow()
+    {
+        InitializeComponent();
+        _vm = new SearchViewModel(App.DB);
+        DataContext = _vm;
+    }
+
+    public void Toggle()
+    {
+        if (IsVisible) HideWindow(); else ShowWindow();
+    }
+
+    public new void Show() => ShowWindow();
+
+    private void ShowWindow()
+    {
+        var screen = System.Windows.SystemParameters.WorkArea;
+        Left = screen.Left + (screen.Width - Width) / 2;
+        Top  = screen.Top  + screen.Height * 0.22;
+        base.Show();
+        SearchBox.Focus();
+        Activate();
+    }
+
+    private void HideWindow()
+    {
+        Hide();
+        SearchBox.Text = "";
+        _vm.ClearSearch();
+        RebuildResults();
+    }
+
+    private void SearchBox_TextChanged(object s, TextChangedEventArgs e)
+    {
+        _vm.Query = SearchBox.Text;
+        RebuildResults();
+    }
+
+    private void RebuildResults()
+    {
+        ResultsPanel.Children.Clear();
+        ResultsArea.Visibility = _vm.Results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var group in _vm.Results)
+        {
+            var lbl = new TextBlock
+            {
+                Text       = group.TeamDisplayName.ToUpperInvariant(),
+                Foreground = (Brush)FindResource("FgTeamLabel"),
+                FontSize   = 10, FontWeight = FontWeights.SemiBold,
+                Margin     = new Thickness(16, 8, 0, 2)
+            };
+            ResultsPanel.Children.Add(lbl);
+            foreach (var item in group.Items)
+                ResultsPanel.Children.Add(BuildDocRow(item));
+        }
+    }
+
+    private UIElement BuildDocRow(SearchResultItem item)
+    {
+        var outer = new StackPanel();
+        var docGrid = new Grid { Cursor = Cursors.Hand, Background = Brushes.Transparent };
+        docGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        docGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var docText = new Controls.HighlightText
+        {
+            TextValue  = item.DocumentName,
+            Keyword    = _vm.Query,
+            Foreground = item.IsDocumentNameMatched
+                         ? (Brush)FindResource("FgPrimary")
+                         : (Brush)FindResource("FgSecondary"),
+            Margin     = new Thickness(16, 0, 8, 0),
+            Padding    = new Thickness(0, 9, 0, 9),
+            FontSize   = 14
+        };
+        Grid.SetColumn(docText, 0);
+        docGrid.Children.Add(docText);
+
+        var pagesPanel = new StackPanel();
+        pagesPanel.Visibility = item.IsExpanded ? Visibility.Visible : Visibility.Collapsed;
+
+        if (item.HasMatchedChildren)
+        {
+            var foldBtn = new Button
+            {
+                Content = item.IsExpanded ? "▼" : "▶",
+                Style   = (Style)FindResource("FlatButton"),
+                Margin  = new Thickness(0, 0, 10, 0),
+                Tag     = (item, pagesPanel)
+            };
+            foldBtn.Click += (_, _) =>
+            {
+                item.IsExpanded = !item.IsExpanded;
+                foldBtn.Content = item.IsExpanded ? "▼" : "▶";
+                pagesPanel.Visibility = item.IsExpanded ? Visibility.Visible : Visibility.Collapsed;
+            };
+            Grid.SetColumn(foldBtn, 1);
+            docGrid.Children.Add(foldBtn);
+        }
+
+        docGrid.MouseLeftButtonUp += (_, _) => OpenUrl(item.DocumentUrl);
+        docGrid.MouseEnter += (_, _) => docGrid.Background = (Brush)FindResource("BgHover");
+        docGrid.MouseLeave += (_, _) => docGrid.Background = Brushes.Transparent;
+        outer.Children.Add(docGrid);
+
+        foreach (var page in item.ChildPages)
+        {
+            var pageGrid = new Grid { Cursor = Cursors.Hand, Background = Brushes.Transparent };
+            var pageText = new Controls.HighlightText
+            {
+                TextValue  = page.PageName,
+                Keyword    = _vm.Query,
+                Foreground = (Brush)FindResource("FgSecondary"),
+                Margin     = new Thickness(40, 0, 16, 0),
+                Padding    = new Thickness(0, 6, 0, 6),
+                FontSize   = 13
+            };
+            pageGrid.Children.Add(pageText);
+            pageGrid.MouseLeftButtonUp += (_, _) => OpenUrl(page.PageUrl);
+            pageGrid.MouseEnter += (_, _) => pageGrid.Background = (Brush)FindResource("BgHover");
+            pageGrid.MouseLeave += (_, _) => pageGrid.Background = Brushes.Transparent;
+            pagesPanel.Children.Add(pageGrid);
+        }
+        outer.Children.Add(pagesPanel);
+        return outer;
+    }
+
+    private static void OpenUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return;
+        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch { }
+    }
+
+    public void ShowUpdateBadge(UpdateInfo info)
+    {
+        _pendingUpdate = info;
+        UpdateBtn.Visibility = Visibility.Visible;
+    }
+
+    public void ShowApiKeyError() => ApiErrorBar.Visibility = Visibility.Visible;
+
+    private async void UpdateBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pendingUpdate == null) return;
+        UpdateBtn.IsEnabled = false;
+        try
+        {
+            var prog = new Progress<int>();
+            var path = await App.Updater.DownloadInstallerAsync(_pendingUpdate.DownloadUrl, prog);
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            Application.Current.Shutdown();
+        }
+        catch { UpdateBtn.IsEnabled = true; }
+    }
+
+    private void ApiErrorGotoSettings_Click(object s, RoutedEventArgs e)
+    {
+        ApiErrorBar.Visibility = Visibility.Collapsed;
+        App.OpenSettings();
+    }
+
+    private void FoldButton_Click(object s, RoutedEventArgs e) { }
+
+    private void Window_Deactivated(object s, EventArgs e) => HideWindow();
+    private void Window_KeyDown(object s, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape) HideWindow();
+    }
+    private void ResultsScroll_PreviewMouseWheel(object s, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        if (s is ScrollViewer sv) { sv.ScrollToVerticalOffset(sv.VerticalOffset - e.Delta / 3.0); e.Handled = true; }
+    }
+}

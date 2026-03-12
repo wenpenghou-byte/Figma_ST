@@ -1,0 +1,73 @@
+<Window x:Class="FigmaSearch.Windows.FirstRunWizard"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FigmaSearch - 初始配置" Width="500" Height="460"
+        WindowStyle="SingleBorderWindow" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgPrimary}" Foreground="{StaticResource FgPrimary}">
+    <Grid Margin="32">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="欢迎使用 FigmaSearch" FontSize="22" FontWeight="Bold"
+                   Foreground="{StaticResource FgPrimary}" Margin="0,0,0,8"/>
+        <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,24"
+                   Foreground="{StaticResource FgSecondary}" FontSize="13">
+            请配置您的 Figma 信息以开始使用。如果没有 API Key，请前往 Figma 账户设置 → Security → Personal access tokens 获取。
+        </TextBlock>
+        <StackPanel Grid.Row="2">
+            <!-- API Key -->
+            <TextBlock Text="Figma API Key" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+            <PasswordBox x:Name="ApiKeyBox" Background="{StaticResource BgTertiary}"
+                         Foreground="{StaticResource FgPrimary}" BorderBrush="{StaticResource BorderColor}"
+                         Padding="10,8" FontSize="13" Margin="0,0,0,4"/>
+            <TextBlock x:Name="ApiKeyHint" Text="请输入 API Key" Foreground="{StaticResource FgDisabled}"
+                       FontSize="11" Margin="0,0,0,20"/>
+            <!-- Teams -->
+            <TextBlock Text="Team ID + 显示名称" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8">
+                <StackPanel>
+                    <DataGrid x:Name="TeamsGrid" Background="{StaticResource BgTertiary}"
+                              Foreground="{StaticResource FgPrimary}" BorderThickness="0"
+                              RowBackground="{StaticResource BgTertiary}"
+                              AlternatingRowBackground="{StaticResource BgSecondary}"
+                              GridLinesVisibility="None" HeadersVisibility="Column"
+                              AutoGenerateColumns="False" CanUserAddRows="False"
+                              MinHeight="60" MaxHeight="120">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Team ID" Binding="{Binding TeamId}" Width="*"/>
+                            <DataGridTextColumn Header="显示名称" Binding="{Binding DisplayName}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <Grid Margin="8,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="NewTeamId" Grid.Column="0" Margin="0,0,4,0"
+                                 Style="{StaticResource SearchBox}" FontSize="13"/>
+                        <TextBox x:Name="NewTeamName" Grid.Column="1" Margin="0,0,4,0"
+                                 Style="{StaticResource SearchBox}" FontSize="13"/>
+                        <Button Grid.Column="2" Content="+"
+                                Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
+                                Padding="12,6" Click="AddTeam_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <!-- Startup checkbox -->
+            <CheckBox x:Name="StartupCheck" Content="开机自动启动"
+                      Foreground="{StaticResource FgPrimary}" IsChecked="True" Margin="0,8,0,0"/>
+        </StackPanel>
+        <!-- Bottom -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="跳过" Style="{StaticResource FlatButton}"
+                    Background="{StaticResource BgTertiary}" Padding="20,8" Margin="0,0,8,0" Click="Skip_Click"/>
+            <Button Content="开始使用 →" Style="{StaticResource FlatButton}"
+                    Background="{StaticResource AccentBlue}" Foreground="White" Padding="20,8" Click="Start_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
