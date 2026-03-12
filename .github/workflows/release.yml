@@ -38,15 +38,19 @@ jobs:
             -o installer/publish
 
       - name: Install NSIS
-        run: choco install nsis -y
+        shell: bash
+        run: |
+          choco install nsis -y
+          echo "C:/Program Files (x86)/NSIS" >> $GITHUB_PATH
 
       - name: Create dist folder
         shell: bash
         run: mkdir -p installer/dist
 
       - name: Build NSIS installer
+        shell: bash
         working-directory: installer
-        run: makensis setup.nsi
+        run: '/c/Program Files (x86)/NSIS/makensis.exe setup.nsi'
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
