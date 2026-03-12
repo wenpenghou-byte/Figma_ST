@@ -19,7 +19,7 @@
     <SolidColorBrush x:Key="AccentHover"  Color="#1C97EA"/>
     <SolidColorBrush x:Key="ErrorRed"     Color="#F44336"/>
     <SolidColorBrush x:Key="SuccessGreen" Color="#4CAF50"/>
-    <SolidColorBrush x:Key="WarningOrange"Color="#FF9800"/>
+    <SolidColorBrush x:Key="WarningOrange" Color="#FF9800"/>
 
     <!-- Border -->
     <SolidColorBrush x:Key="BorderColor"  Color="#3C3C3C"/>
