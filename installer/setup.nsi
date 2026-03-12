@@ -76,12 +76,27 @@ SectionEnd
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Section "Uninstall"
-    Delete "$INSTDIR\FigmaSearch.exe"
-    Delete "$INSTDIR\Uninstall.exe"
+    ; Kill the process if still running and wait
+    ExecWait 'taskkill /f /im FigmaSearch.exe'
+    Sleep 1500
+
+    ; Remove all files in install dir (force delete)
     RMDir /r "$INSTDIR"
+
+    ; If RMDir failed (files still locked), try again after another wait
+    IfFileExists "$INSTDIR\*.*" 0 +3
+        Sleep 2000
+        RMDir /r "$INSTDIR"
+
+    ; Remove shortcuts
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
     Delete "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
     RMDir  "$SMPROGRAMS\${PRODUCT_NAME}"
+
+    ; Remove AppData folder (database, settings)
+    RMDir /r "$APPDATA\${PRODUCT_NAME}"
+
+    ; Remove registry entries
     DeleteRegKey HKLM "${UNINST_KEY}"
     DeleteRegKey HKLM "Software\${PRODUCT_NAME}"
     DeleteRegValue HKCU "${RUN_KEY}" "${PRODUCT_NAME}"
