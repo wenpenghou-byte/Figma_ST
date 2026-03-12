@@ -27,7 +27,7 @@ Unicode True
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\FigmaSearch.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "立即运行 FigmaSearch"
+!define MUI_FINISHPAGE_RUN_TEXT "Launch FigmaSearch now"
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_WELCOME
@@ -39,7 +39,7 @@ Unicode True
 !insertmacro MUI_LANGUAGE "English"
 
 ; Main section (required)
-Section "FigmaSearch 主程序" SEC_MAIN
+Section "FigmaSearch Core" SEC_MAIN
     SectionIn RO
     SetOutPath "$INSTDIR"
     SetOverwrite ifnewer
@@ -55,24 +55,24 @@ Section "FigmaSearch 主程序" SEC_MAIN
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
 
-Section /o "创建桌面快捷方式" SEC_DESKTOP
+Section /o "Desktop Shortcut" SEC_DESKTOP
     CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\FigmaSearch.exe"
 SectionEnd
 
-Section /o "创建开始菜单快捷方式" SEC_STARTMENU
+Section /o "Start Menu Shortcut" SEC_STARTMENU
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
     CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\FigmaSearch.exe"
 SectionEnd
 
-Section /o "开机自动启动" SEC_STARTUP
+Section /o "Run at Startup" SEC_STARTUP
     WriteRegStr HKCU "${RUN_KEY}" "${PRODUCT_NAME}" '"$INSTDIR\FigmaSearch.exe"'
 SectionEnd
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
-    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_MAIN}      "必选：安装主程序"
-    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DESKTOP}   "创建桌面快捷方式"
-    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_STARTMENU} "创建开始菜单快捷方式"
-    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_STARTUP}   "开机自动启动"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_MAIN}      "Required: Install main program"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DESKTOP}   "Create a shortcut on Desktop"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_STARTMENU} "Create a shortcut in Start Menu"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_STARTUP}   "Launch FigmaSearch on Windows startup"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Section "Uninstall"
