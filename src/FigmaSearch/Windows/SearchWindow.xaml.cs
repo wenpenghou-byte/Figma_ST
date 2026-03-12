@@ -178,7 +178,17 @@ public partial class SearchWindow : Window
 
     private void FoldButton_Click(object s, RoutedEventArgs e) { }
 
-    private void Window_Deactivated(object s, EventArgs e) => HideWindow();
+    private void Window_Deactivated(object s, EventArgs e)
+    {
+        // Don't hide if another window owned by this app just got focus
+        // (e.g. SettingsWindow or FirstRunWizard opening on top)
+        var active = Application.Current.Windows
+            .OfType<Window>()
+            .FirstOrDefault(w => w.IsActive);
+        if (active != null && active != this)
+            return;
+        HideWindow();
+    }
     private void Window_KeyDown(object s, KeyEventArgs e)
     {
         if (e.Key == Key.Escape) HideWindow();
