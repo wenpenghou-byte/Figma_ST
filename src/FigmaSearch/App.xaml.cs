@@ -47,10 +47,7 @@ public partial class App : Application
             // (no API key OR no teams means nothing was configured at all)
             if (string.IsNullOrEmpty(settings.FigmaApiKey) || DB.GetTeams().Count == 0)
             {
-                // Setup incomplete — release mutex so user can relaunch
-                _instanceMutex.ReleaseMutex();
-                _instanceMutex.Dispose();
-                _instanceMutex = null;
+                // Setup incomplete — clean shutdown so user can relaunch
                 Shutdown();
                 return;
             }
@@ -111,13 +108,10 @@ public partial class App : Application
         try { icon.IconSource = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Resources/tray.ico")); } catch { }
 
         var menu = new System.Windows.Controls.ContextMenu();
-        var itemShow = new System.Windows.Controls.MenuItem { Header = "显示搜索框" };
-        itemShow.Click += (_, _) => SearchWin.Show();
         var itemSettings = new System.Windows.Controls.MenuItem { Header = "设置" };
         itemSettings.Click += (_, _) => OpenSettings();
         var itemExit = new System.Windows.Controls.MenuItem { Header = "退出" };
-        itemExit.Click += (_, _) => { Hotkey?.Dispose(); AutoSync?.Dispose(); Shutdown(); };
-        menu.Items.Add(itemShow);
+        itemExit.Click += (_, _) => Shutdown();
         menu.Items.Add(itemSettings);
         menu.Items.Add(new System.Windows.Controls.Separator());
         menu.Items.Add(itemExit);
@@ -147,12 +141,12 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _trayIcon?.Dispose();
-        Hotkey?.Dispose();
-        AutoSync?.Dispose();
-        DB?.Dispose();
+        try { _trayIcon?.Dispose(); } catch { }
+        try { Hotkey?.Dispose(); } catch { }
+        try { AutoSync?.Dispose(); } catch { }
+        try { DB?.Dispose(); } catch { }
         try { _instanceMutex?.ReleaseMutex(); } catch { }
-        _instanceMutex?.Dispose();
+        try { _instanceMutex?.Dispose(); } catch { }
         base.OnExit(e);
     }
 }

@@ -82,6 +82,7 @@ public partial class SettingsWindow : Window
 
     private void IntervalSlider_Changed(object s, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (_vm == null) return; // guard: fires during InitializeComponent before _vm is assigned
         var v = (int)e.NewValue;
         _vm.UpdateIntervalHours = v;
         if (IntervalLabel != null) IntervalLabel.Text = $"{v} 小时";

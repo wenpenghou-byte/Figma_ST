@@ -42,10 +42,10 @@ public partial class FirstRunWizard : Window
         catch { }
     }
 
-    // "退出" button — exit the app immediately
+    // "退出" button — close wizard and let App.OnStartup handle shutdown
     private void Skip_Click(object s, RoutedEventArgs e)
     {
-        Application.Current.Shutdown();
+        Close();
     }
 
     private async void Start_Click(object s, RoutedEventArgs e)
