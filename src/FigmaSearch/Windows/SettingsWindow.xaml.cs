@@ -29,6 +29,7 @@ public partial class SettingsWindow : Window
         ThemeCombo.SelectionChanged -= ThemeCombo_Changed;
         ThemeCombo.SelectedIndex = _vm.Theme == "Light" ? 1 : 0;
         ThemeCombo.SelectionChanged += ThemeCombo_Changed;
+        VersionLabel.Text = $"当前版本：{UpdateService.CurrentVersion()}";
         UpdateDbStats();
     }
 
@@ -193,6 +194,44 @@ public partial class SettingsWindow : Window
         string.Equals(config, "DoubleAlt", StringComparison.OrdinalIgnoreCase)
             ? "双击左 Alt"
             : config.Replace("+", " + ");
+
+    // ── Update check ─────────────────────────────────────────────
+
+    private async void CheckUpdate_Click(object s, RoutedEventArgs e)
+    {
+        CheckUpdateBtn.IsEnabled = false;
+        UpdateStatus.Text = "正在检查…";
+        UpdateStatus.Foreground = (Brush)FindResource("FgSecondary");
+        try
+        {
+            var info = await App.Updater.CheckForUpdateAsync();
+            if (info == null)
+            {
+                UpdateStatus.Text = "检查失败，请稍后重试";
+                UpdateStatus.Foreground = (Brush)FindResource("ErrorRed");
+            }
+            else if (info.IsNewer)
+            {
+                UpdateStatus.Text = $"发现新版本 v{info.LatestVersion}，点击搜索框右上角更新按钮安装";
+                UpdateStatus.Foreground = (Brush)FindResource("SuccessGreen");
+                App.SearchWin.ShowUpdateBadge(info);
+            }
+            else
+            {
+                UpdateStatus.Text = $"已是最新版本（v{info.LatestVersion}）";
+                UpdateStatus.Foreground = (Brush)FindResource("FgSecondary");
+            }
+        }
+        catch
+        {
+            UpdateStatus.Text = "检查失败，请检查网络连接";
+            UpdateStatus.Foreground = (Brush)FindResource("ErrorRed");
+        }
+        finally
+        {
+            CheckUpdateBtn.IsEnabled = true;
+        }
+    }
 
     // ── Sync ─────────────────────────────────────────────────────
 

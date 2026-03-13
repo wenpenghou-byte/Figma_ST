@@ -120,6 +120,17 @@
                     </StackPanel>
                     <TextBlock x:Name="DbStats" Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,8,0,0"/>
                 </StackPanel>
+                <!-- Check for updates -->
+                <StackPanel Margin="0,0,0,16">
+                    <TextBlock Text="应用更新" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="CheckUpdateBtn" Content="检查更新" Style="{StaticResource FlatButton}"
+                                Background="{StaticResource BgHover}" Padding="14,8" Click="CheckUpdate_Click"/>
+                        <TextBlock x:Name="UpdateStatus" Margin="12,0,0,0"
+                                   Foreground="{StaticResource FgSecondary}" VerticalAlignment="Center" FontSize="12"/>
+                    </StackPanel>
+                    <TextBlock x:Name="VersionLabel" Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,8,0,0"/>
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
