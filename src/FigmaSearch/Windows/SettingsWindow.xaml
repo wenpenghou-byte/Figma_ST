@@ -86,6 +86,20 @@
                 <CheckBox x:Name="StartupCheck" Content="开机启动"
                           Foreground="{StaticResource FgPrimary}" Margin="0,0,0,16"
                           Checked="StartupCheck_Changed" Unchecked="StartupCheck_Changed"/>
+                <!-- Hotkey -->
+                <StackPanel Margin="0,0,0,16">
+                    <TextBlock Text="唤醒搜索框快捷键" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox x:Name="HotkeyBox" Width="200" IsReadOnly="True" Cursor="Hand"
+                                 Style="{StaticResource SearchBox}" FontSize="13" TextAlignment="Center"
+                                 PreviewKeyDown="HotkeyBox_PreviewKeyDown" GotFocus="HotkeyBox_GotFocus" LostFocus="HotkeyBox_LostFocus"/>
+                        <Button Content="恢复默认" Margin="8,0,0,0"
+                                Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
+                                Padding="12,8" Click="HotkeyReset_Click"/>
+                    </StackPanel>
+                    <TextBlock x:Name="HotkeyHint" Text="点击输入框后按下快捷键组合（需含 Ctrl/Alt/Shift 修饰键）"
+                               Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,4,0,0"/>
+                </StackPanel>
                 <!-- Manual sync -->
                 <StackPanel Margin="0,0,0,16">
                     <TextBlock Text="文档信息" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
