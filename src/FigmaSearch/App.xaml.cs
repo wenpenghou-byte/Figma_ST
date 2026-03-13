@@ -73,8 +73,8 @@ public partial class App : Application
         if (!string.IsNullOrEmpty(settings.FigmaApiKey))
         {
             AutoSync.Start(settings.UpdateIntervalHours);
-            // Trigger immediate sync (first run or periodic check)
-            AutoSync.RunNow();
+            // Startup check: respects interval (force=false), won't sync if recently synced
+            AutoSync.RunNow(force: false);
         }
 
         // Version check (every startup)

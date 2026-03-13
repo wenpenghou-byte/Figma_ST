@@ -41,12 +41,14 @@ public class AutoSyncService : IDisposable
     public void Stop() { _timer?.Dispose(); _timer = null; }
 
     /// <summary>
-    /// Trigger an immediate background sync. Does nothing if already syncing.
+    /// Trigger an immediate background sync.
+    /// - force=true: always sync regardless of last sync time (first run, manual sync)
+    /// - force=false: respects the update interval, skips if synced recently (startup check)
     /// </summary>
-    public void RunNow()
+    public void RunNow(bool force = false)
     {
         if (_syncing) return;
-        _ = DoSyncAsync();
+        _ = DoSyncAsync(force);
     }
 
     private async void OnTick(object? state)
@@ -59,12 +61,22 @@ public class AutoSyncService : IDisposable
         if (last.HasValue && (DateTime.UtcNow - last.Value).TotalHours < settings.UpdateIntervalHours)
             return;
 
-        await DoSyncAsync();
+        await DoSyncAsync(force: false);
     }
 
-    private async Task DoSyncAsync()
+    private async Task DoSyncAsync(bool force = false)
     {
         if (_syncing) return;
+
+        // When not forced, respect the update interval (same check as OnTick)
+        if (!force)
+        {
+            var s = _db.LoadSettings();
+            var last = _db.GetLastSyncTime();
+            if (last.HasValue && (DateTime.UtcNow - last.Value).TotalHours < s.UpdateIntervalHours)
+                return;
+        }
+
         _syncing = true;
         _cts = new CancellationTokenSource();
         bool success = false;
@@ -76,10 +88,11 @@ public class AutoSyncService : IDisposable
             var teams = _db.GetTeams();
             if (teams.Count == 0) return;
 
-            // Collect already-synced file keys across all teams for resume support
+            // Collect already-synced files with their last_modified timestamps
+            // (used to skip files that haven't changed in Figma)
             var alreadySynced = teams
                 .SelectMany(t => _db.GetSyncedFileKeys(t.TeamId))
-                .ToHashSet();
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
 
             var progress = new Progress<SyncProgress>(p => SyncProgressChanged?.Invoke(p));
 

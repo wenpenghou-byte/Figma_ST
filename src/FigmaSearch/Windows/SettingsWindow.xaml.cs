@@ -213,7 +213,7 @@ public partial class SettingsWindow : Window
         }
 
         _vm.Save();
-        App.AutoSync.RunNow();
+        App.AutoSync.RunNow(force: true);
         SyncStatus.Text = "已在后台开始同步，进度可在搜索框中查看";
     }
 
@@ -225,7 +225,7 @@ public partial class SettingsWindow : Window
         // Apply new hotkey immediately
         App.Hotkey?.ApplyConfig(_vm.HotkeyConfig);
         // Trigger background sync so new/changed teams are fetched immediately
-        App.AutoSync?.RunNow();
+        App.AutoSync?.RunNow(force: true);
         Close();
     }
 
