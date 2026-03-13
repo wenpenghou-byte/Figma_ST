@@ -1,6 +1,7 @@
-using FigmaSearch.Models;
+﻿using FigmaSearch.Models;
 using FigmaSearch.Services;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
 
@@ -9,6 +10,7 @@ namespace FigmaSearch.Windows;
 public partial class FirstRunWizard : Window
 {
     private readonly ObservableCollection<TeamConfig> _teams = new();
+    // Set to true only when setup completes successfully (API key + at least one team saved)
 
     public FirstRunWizard()
     {
@@ -28,16 +30,14 @@ public partial class FirstRunWizard : Window
 
     private void ApiKeyHelp_Click(object s, RoutedEventArgs e)
     {
-        try { Process.Start(new ProcessStartInfo("https://docs.popo.netease.com/team/pc/5_63c60p/pageDetail/82a0a23187c74981ba8461b78ac9") { UseShellExecute = true }); }
+        try { Process.Start(new ProcessStartInfo("https://icn5csa86jjp.feishu.cn/wiki/YkeawdgdyiyhT1kBdowcy8qfn8a") { UseShellExecute = true }); }
         catch { }
     }
 
+    // "退出" button — exit the app immediately
     private void Skip_Click(object s, RoutedEventArgs e)
     {
-        var settings = App.DB.LoadSettings();
-        settings.IsFirstRun = false;
-        App.DB.SaveSettings(settings);
-        Close();
+        Application.Current.Shutdown();
     }
 
     private async void Start_Click(object s, RoutedEventArgs e)
@@ -49,6 +49,13 @@ public partial class FirstRunWizard : Window
             ApiKeyHint.Foreground = System.Windows.Media.Brushes.OrangeRed;
             return;
         }
+        if (_teams.Count == 0)
+        {
+            SyncStatus.Visibility = Visibility.Visible;
+            SyncStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
+            SyncStatus.Text = "请至少添加一个 Team ID，否则无法搜索文档";
+            return;
+        }
 
         // Save settings
         var settings = App.DB.LoadSettings();
@@ -58,15 +65,6 @@ public partial class FirstRunWizard : Window
         App.DB.SaveSettings(settings);
         App.DB.SaveTeams(_teams);
         StartupManager.Set(settings.LaunchAtStartup);
-
-        if (_teams.Count == 0)
-        {
-            SyncStatus.Visibility = Visibility.Visible;
-            SyncStatus.Text = "未添加 Team，跳过同步。可在设置中添加。";
-            await System.Threading.Tasks.Task.Delay(1200);
-            Close();
-            return;
-        }
 
         // Show syncing state
         StartButton.IsEnabled = false;
@@ -106,4 +104,5 @@ public partial class FirstRunWizard : Window
             SkipButton.IsEnabled  = true;
         }
     }
+
 }

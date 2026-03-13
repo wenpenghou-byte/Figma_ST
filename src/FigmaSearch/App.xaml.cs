@@ -1,4 +1,4 @@
-using FigmaSearch.Services;
+﻿using FigmaSearch.Services;
 using FigmaSearch.Windows;
 using Hardcodet.Wpf.TaskbarNotification;
 using System.Windows;
@@ -34,7 +34,14 @@ public partial class App : Application
         {
             var wizard = new FirstRunWizard();
             wizard.ShowDialog();
+            // After wizard closes, check that setup is complete (API key + at least one team).
+            // If not, the user closed/exited without finishing — shut down entirely.
             settings = DB.LoadSettings();
+            if (string.IsNullOrEmpty(settings.FigmaApiKey) || DB.GetTeams().Count == 0)
+            {
+                Shutdown();
+                return;
+            }
         }
 
         // Build tray icon

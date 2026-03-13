@@ -1,9 +1,11 @@
-; FigmaSearch NSIS Installer
+﻿; FigmaSearch NSIS Installer
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
 !define PRODUCT_NAME     "FigmaSearch"
-!define PRODUCT_VERSION  "1.0.0"
+!ifndef PRODUCT_VERSION
+  !define PRODUCT_VERSION  "1.0.0"
+!endif
 !define PRODUCT_PUBLISHER "wenpenghou-byte"
 !define PRODUCT_URL      "https://github.com/wenpenghou-byte/Figma_ST"
 !define UNINST_KEY       "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"

@@ -1,4 +1,4 @@
-using FigmaSearch.Models;
+﻿using FigmaSearch.Models;
 using FigmaSearch.Services;
 using FigmaSearch.ViewModels;
 using System.Diagnostics;
@@ -13,6 +13,7 @@ public partial class SearchWindow : Window
 {
     private readonly SearchViewModel _vm;
     private UpdateInfo? _pendingUpdate;
+    private bool _hasBeenShown;
 
     public SearchWindow()
     {
@@ -30,6 +31,7 @@ public partial class SearchWindow : Window
 
     private void ShowWindow()
     {
+        _hasBeenShown = true;
         var screen = System.Windows.SystemParameters.WorkArea;
         Left = screen.Left + (screen.Width - Width) / 2;
         Top  = screen.Top  + screen.Height * 0.22;
@@ -179,6 +181,8 @@ public partial class SearchWindow : Window
 
     private void Window_Deactivated(object s, EventArgs e)
     {
+        // Never hide if this window has not been explicitly shown yet
+        if (!_hasBeenShown) return;
         // Don't hide if another window owned by this app has focus or is visible
         // (e.g. SettingsWindow or FirstRunWizard)
         foreach (Window w in Application.Current.Windows)

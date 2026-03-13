@@ -1,4 +1,4 @@
-name: Build and Release
+﻿name: Build and Release
 
 on:
   push:
@@ -53,7 +53,7 @@ jobs:
       - name: Build NSIS installer
         shell: pwsh
         working-directory: installer
-        run: makensis setup.nsi
+        run: makensis /DPRODUCT_VERSION=${{ steps.version.outputs.version }} setup.nsi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -1,4 +1,4 @@
-<Window x:Class="FigmaSearch.Windows.FirstRunWizard"
+﻿<Window x:Class="FigmaSearch.Windows.FirstRunWizard"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="肥姑妈搜 - 初始配置" Width="500" Height="560"
@@ -79,7 +79,7 @@
                        Foreground="{StaticResource AccentBlue}" FontSize="12"
                        TextWrapping="Wrap" Margin="0,0,0,10"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="SkipButton" Content="跳过" Style="{StaticResource FlatButton}"
+                <Button x:Name="SkipButton" Content="退出" Style="{StaticResource FlatButton}"
                         Background="{StaticResource BgTertiary}" Padding="20,8" Margin="0,0,8,0" Click="Skip_Click"/>
                 <Button x:Name="StartButton" Content="开始使用 →" Style="{StaticResource FlatButton}"
                         Background="{StaticResource AccentBlue}" Foreground="White" Padding="20,8" Click="Start_Click"/>

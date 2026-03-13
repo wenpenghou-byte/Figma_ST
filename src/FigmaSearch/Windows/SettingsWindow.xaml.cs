@@ -39,7 +39,7 @@ public partial class SettingsWindow : Window
 
     private void ApiKeyHelp_Click(object s, RoutedEventArgs e)
     {
-        try { Process.Start(new ProcessStartInfo("https://docs.popo.netease.com/team/pc/5_63c60p/pageDetail/82a0a23187c74981ba8461b78ac9") { UseShellExecute = true }); }
+        try { Process.Start(new ProcessStartInfo("https://icn5csa86jjp.feishu.cn/wiki/YkeawdgdyiyhT1kBdowcy8qfn8a") { UseShellExecute = true }); }
         catch { }
     }
 
