@@ -77,6 +77,24 @@ public class DatabaseService : IDisposable
     public void SaveTeams(IEnumerable<TeamConfig> teams)
     {
         var c = Conn(); using var tx = c.BeginTransaction();
+
+        // Detect removed teams and purge their documents/pages/search index
+        var oldTeamIds = c.Query<string>("SELECT team_id FROM Teams", transaction: tx).ToHashSet();
+        var newTeamIds = teams.Select(t => t.TeamId).ToHashSet();
+        var removedIds = oldTeamIds.Except(newTeamIds).ToList();
+        foreach (var teamId in removedIds)
+        {
+            var fileKeys = c.Query<string>("SELECT key FROM Documents WHERE team_id=@teamId", new { teamId }, tx).ToList();
+            if (fileKeys.Count > 0)
+            {
+                var inList = string.Join(",", fileKeys.Select(k => $"'{k.Replace("'", "''")}'"));
+                c.Execute($"DELETE FROM Pages       WHERE document_key IN ({inList})", transaction: tx);
+                c.Execute($"DELETE FROM SearchIndex WHERE document_key IN ({inList})", transaction: tx);
+            }
+            c.Execute("DELETE FROM Documents   WHERE team_id=@teamId", new { teamId }, tx);
+            c.Execute("DELETE FROM SearchIndex WHERE team_id=@teamId", new { teamId }, tx);
+        }
+
         c.Execute("DELETE FROM Teams", transaction: tx);
         int order = 0;
         foreach (var t in teams)
