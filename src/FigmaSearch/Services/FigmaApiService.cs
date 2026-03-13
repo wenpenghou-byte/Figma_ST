@@ -96,12 +96,12 @@ public class FigmaApiService
         List<TeamConfig> teams,
         string token,
         IProgress<SyncProgress> progress,
-        HashSet<string>? alreadySyncedKeys = null,
+        Dictionary<string, string>? alreadySyncedKeys = null,
         Action<FigmaFile, List<FigmaPage>>? onFileSynced = null,
         Action<string, HashSet<string>>? onTeamFinished = null,
         CancellationToken ct = default)
     {
-        alreadySyncedKeys ??= new HashSet<string>();
+        alreadySyncedKeys ??= new Dictionary<string, string>();
 
         for (int ti = 0; ti < teams.Count; ti++)
         {
@@ -146,19 +146,23 @@ public class FigmaApiService
                 {
                     ct.ThrowIfCancellationRequested();
                     var file     = files[fi];
-                    var fileKey  = file.GetProperty("key").GetString() ?? "";
-                    var fileName = file.GetProperty("name").GetString() ?? "";
-                    var fileUrl  = $"https://www.figma.com/file/{fileKey}";
+                    var fileKey      = file.GetProperty("key").GetString() ?? "";
+                    var fileName     = file.GetProperty("name").GetString() ?? "";
+                    var fileUrl      = $"https://www.figma.com/file/{fileKey}";
+                    var lastModified = file.TryGetProperty("last_modified", out var lmProp)
+                                       ? (lmProp.GetString() ?? "") : "";
 
                     teamFileKeys.Add(fileKey);
 
-                    // ── RESUME: skip files already persisted ──
-                    if (alreadySyncedKeys.Contains(fileKey))
+                    // ── Skip if file exists AND last_modified hasn't changed ──
+                    if (alreadySyncedKeys.TryGetValue(fileKey, out var storedLm)
+                        && storedLm == lastModified
+                        && !string.IsNullOrEmpty(lastModified))
                     {
                         skippedFiles++;
                         progress.Report(new SyncProgress
                         {
-                            Phase    = "已跳过（上次已同步）",
+                            Phase    = "已跳过（未修改）",
                             TeamName = team.DisplayName,
                             Current  = fi + 1,
                             Total    = files.Count,
@@ -178,12 +182,13 @@ public class FigmaApiService
 
                     var doc = new FigmaFile
                     {
-                        Key         = fileKey,
-                        ProjectId   = projId,
-                        ProjectName = projName,
-                        TeamId      = team.TeamId,
-                        Name        = fileName,
-                        Url         = fileUrl
+                        Key              = fileKey,
+                        ProjectId        = projId,
+                        ProjectName      = projName,
+                        TeamId           = team.TeamId,
+                        Name             = fileName,
+                        Url              = fileUrl,
+                        FigmaLastModified = lastModified
                     };
 
                     var filePages = new List<FigmaPage>();
@@ -210,7 +215,7 @@ public class FigmaApiService
 
                     // ── Persist immediately after each file ──
                     onFileSynced?.Invoke(doc, filePages);
-                    alreadySyncedKeys.Add(fileKey);
+                    alreadySyncedKeys[fileKey] = lastModified; // update in-memory cache for resume
                     newFiles++;
 
                     await Task.Delay(200, ct); // respect rate limits

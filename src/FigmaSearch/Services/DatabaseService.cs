@@ -32,10 +32,12 @@ public class DatabaseService : IDisposable
         Conn().Execute(@"
             CREATE TABLE IF NOT EXISTS Settings (key TEXT PRIMARY KEY, value TEXT);
             CREATE TABLE IF NOT EXISTS Teams (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, sort_order INTEGER DEFAULT 0);
-            CREATE TABLE IF NOT EXISTS Documents (key TEXT PRIMARY KEY, project_id TEXT, project_name TEXT, team_id TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL, last_synced TEXT);
+            CREATE TABLE IF NOT EXISTS Documents (key TEXT PRIMARY KEY, project_id TEXT, project_name TEXT, team_id TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL, last_synced TEXT, figma_last_modified TEXT);
             CREATE TABLE IF NOT EXISTS Pages (id TEXT PRIMARY KEY, document_key TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL);
             CREATE VIRTUAL TABLE IF NOT EXISTS SearchIndex USING fts5(entity_type, entity_id, display_name, team_id, document_key);
         ");
+        // Migrate: add figma_last_modified column to existing databases that don't have it
+        try { Conn().Execute("ALTER TABLE Documents ADD COLUMN figma_last_modified TEXT"); } catch { /* column already exists */ }
     }
 
     public string? GetSetting(string key) =>
@@ -147,13 +149,15 @@ public class DatabaseService : IDisposable
         var now = DateTime.UtcNow.ToString("o");
         using var tx = c.BeginTransaction();
 
-        // Upsert document
-        c.Execute(@"INSERT INTO Documents(key,project_id,project_name,team_id,name,url,last_synced)
-                    VALUES(@Key,@ProjectId,@ProjectName,@TeamId,@Name,@Url,@LastSynced)
+        // Upsert document — also store figma_last_modified for change detection
+        c.Execute(@"INSERT INTO Documents(key,project_id,project_name,team_id,name,url,last_synced,figma_last_modified)
+                    VALUES(@Key,@ProjectId,@ProjectName,@TeamId,@Name,@Url,@LastSynced,@FigmaLastModified)
                     ON CONFLICT(key) DO UPDATE SET
                         project_id=excluded.project_id, project_name=excluded.project_name,
-                        name=excluded.name, url=excluded.url, last_synced=excluded.last_synced",
-            new { doc.Key, doc.ProjectId, doc.ProjectName, doc.TeamId, doc.Name, doc.Url, LastSynced = now }, tx);
+                        name=excluded.name, url=excluded.url, last_synced=excluded.last_synced,
+                        figma_last_modified=excluded.figma_last_modified",
+            new { doc.Key, doc.ProjectId, doc.ProjectName, doc.TeamId, doc.Name, doc.Url,
+                  LastSynced = now, FigmaLastModified = doc.FigmaLastModified }, tx);
 
         // Upsert search index entry for document (delete+insert to keep FTS consistent)
         c.Execute("DELETE FROM SearchIndex WHERE entity_type='document' AND entity_id=@key", new { key = doc.Key }, tx);
@@ -175,10 +179,14 @@ public class DatabaseService : IDisposable
     }
 
     /// <summary>
-    /// Returns set of file keys already synced for this team (used to skip on resume).
+    /// Returns dict of (file_key → figma_last_modified) for all synced files in a team.
+    /// Used to skip files whose last_modified hasn't changed since last sync.
     /// </summary>
-    public HashSet<string> GetSyncedFileKeys(string teamId) =>
-        Conn().Query<string>("SELECT key FROM Documents WHERE team_id=@teamId", new { teamId }).ToHashSet();
+    public Dictionary<string, string> GetSyncedFileKeys(string teamId) =>
+        Conn().Query<(string key, string? lm)>(
+            "SELECT key, figma_last_modified FROM Documents WHERE team_id=@teamId",
+            new { teamId })
+        .ToDictionary(r => r.key, r => r.lm ?? "");
 
     /// <summary>
     /// Removes files (and their pages/index) that no longer exist in Figma.
@@ -187,7 +195,7 @@ public class DatabaseService : IDisposable
     public void RemoveDeletedFiles(string teamId, HashSet<string> currentFileKeys)
     {
         var existing = GetSyncedFileKeys(teamId);
-        var toDelete = existing.Except(currentFileKeys).ToList();
+        var toDelete = existing.Keys.Except(currentFileKeys).ToList();
         if (toDelete.Count == 0) return;
 
         var c = Conn(); using var tx = c.BeginTransaction();
