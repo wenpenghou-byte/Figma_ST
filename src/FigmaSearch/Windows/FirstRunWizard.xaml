@@ -60,12 +60,14 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="NewTeamId" Grid.Column="0" Margin="0,0,4,0"
-                                 Style="{StaticResource SearchBox}" FontSize="13"/>
+                                 Style="{StaticResource SearchBox}" FontSize="13"
+                                 TextChanged="NewTeam_TextChanged"/>
                         <TextBox x:Name="NewTeamName" Grid.Column="1" Margin="0,0,4,0"
-                                 Style="{StaticResource SearchBox}" FontSize="13"/>
-                        <Button Grid.Column="2" Content="+"
+                                 Style="{StaticResource SearchBox}" FontSize="13"
+                                 TextChanged="NewTeam_TextChanged"/>
+                        <Button x:Name="AddTeamBtn" Grid.Column="2" Content="写入"
                                 Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
-                                Padding="12,6" Click="AddTeam_Click"/>
+                                Padding="12,6" IsEnabled="False" Click="AddTeam_Click"/>
                     </Grid>
                 </StackPanel>
             </Border>

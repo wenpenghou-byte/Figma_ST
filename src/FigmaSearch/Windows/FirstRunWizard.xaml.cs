@@ -26,6 +26,14 @@ public partial class FirstRunWizard : Window
         _teams.Add(new TeamConfig { TeamId = id, DisplayName = name, SortOrder = _teams.Count });
         NewTeamId.Text = "";
         NewTeamName.Text = "";
+        // Button will be disabled again via TextChanged
+    }
+
+    private void NewTeam_TextChanged(object s, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (AddTeamBtn == null) return;
+        AddTeamBtn.IsEnabled = !string.IsNullOrWhiteSpace(NewTeamId.Text)
+                             && !string.IsNullOrWhiteSpace(NewTeamName.Text);
     }
 
     private void ApiKeyHelp_Click(object s, RoutedEventArgs e)
@@ -71,7 +79,7 @@ public partial class FirstRunWizard : Window
         SkipButton.IsEnabled  = false;
         SyncStatus.Visibility = Visibility.Visible;
         SyncStatus.Foreground = (System.Windows.Media.Brush)FindResource("AccentBlue");
-        SyncStatus.Text = "正在连接 Figma，拉取数据...";
+        SyncStatus.Text = "正在连接 Figma，拉取数据...（大约需要 3-5 分钟，请耐心等待）";
 
         int totalFiles = 0;
         var progress = new Progress<SyncProgress>(p =>
@@ -81,14 +89,25 @@ public partial class FirstRunWizard : Window
 
         try
         {
+            // Collect already-synced keys so that a restart continues from where it left off
+            var alreadySynced = _teams
+                .SelectMany(t => App.DB.GetSyncedFileKeys(t.TeamId))
+                .ToHashSet();
+
             await App.Api.SyncAllTeamsAsync(
                 _teams.ToList(),
                 key,
                 progress,
-                onTeamSynced: (teamId, files, pages) =>
+                alreadySyncedKeys: alreadySynced,
+                onFileSynced: (doc, pages) =>
                 {
-                    App.DB.ReplaceTeamData(teamId, files, pages);
-                    totalFiles += files.Count;
+                    App.DB.UpsertFileData(doc, pages);
+                    totalFiles++;
+                },
+                onTeamFinished: (teamId, currentKeys) =>
+                {
+                    App.DB.RemoveDeletedFiles(teamId, currentKeys);
+                    App.DB.SetLastSyncTime(DateTime.UtcNow);
                 });
 
             SyncStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
@@ -99,7 +118,7 @@ public partial class FirstRunWizard : Window
         catch (Exception ex)
         {
             SyncStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
-            SyncStatus.Text = $"同步失败：{ex.Message}";
+            SyncStatus.Text = $"同步中断：{ex.Message}（已保存进度，可重新点击继续）";
             StartButton.IsEnabled = true;
             SkipButton.IsEnabled  = true;
         }

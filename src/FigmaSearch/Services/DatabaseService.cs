@@ -84,6 +84,7 @@ public class DatabaseService : IDisposable
                 new { t.TeamId, t.DisplayName, SortOrder = order++ }, transaction: tx);
         tx.Commit();
     }
+    // ── Legacy full-replace (kept for compatibility, not used by incremental sync) ──
     public void ReplaceTeamData(string teamId, List<FigmaFile> docs, List<FigmaPage> pages)
     {
         var c = Conn(); using var tx = c.BeginTransaction();
@@ -112,6 +113,69 @@ public class DatabaseService : IDisposable
         }
         tx.Commit();
         SetLastSyncTime(DateTime.UtcNow);
+    }
+
+    // ── Incremental sync: upsert a single file and its pages atomically ──
+    /// <summary>
+    /// Upserts one document + its pages. Safe to call multiple times (idempotent).
+    /// Called per-file so progress is saved immediately; if sync crashes, already-done
+    /// files are skipped on the next run.
+    /// </summary>
+    public void UpsertFileData(FigmaFile doc, List<FigmaPage> pages)
+    {
+        var c   = Conn();
+        var now = DateTime.UtcNow.ToString("o");
+        using var tx = c.BeginTransaction();
+
+        // Upsert document
+        c.Execute(@"INSERT INTO Documents(key,project_id,project_name,team_id,name,url,last_synced)
+                    VALUES(@Key,@ProjectId,@ProjectName,@TeamId,@Name,@Url,@LastSynced)
+                    ON CONFLICT(key) DO UPDATE SET
+                        project_id=excluded.project_id, project_name=excluded.project_name,
+                        name=excluded.name, url=excluded.url, last_synced=excluded.last_synced",
+            new { doc.Key, doc.ProjectId, doc.ProjectName, doc.TeamId, doc.Name, doc.Url, LastSynced = now }, tx);
+
+        // Upsert search index entry for document (delete+insert to keep FTS consistent)
+        c.Execute("DELETE FROM SearchIndex WHERE entity_type='document' AND entity_id=@key", new { key = doc.Key }, tx);
+        c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('document',@key,@name,@teamId,@key)",
+            new { key = doc.Key, name = doc.Name, teamId = doc.TeamId }, tx);
+
+        // Replace pages for this file
+        c.Execute("DELETE FROM Pages WHERE document_key=@key", new { key = doc.Key }, tx);
+        c.Execute("DELETE FROM SearchIndex WHERE entity_type='page' AND document_key=@key", new { key = doc.Key }, tx);
+        foreach (var p in pages)
+        {
+            c.Execute("INSERT INTO Pages(id,document_key,name,url) VALUES(@Id,@DocumentKey,@Name,@Url)", p, tx);
+            c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('page',@id,@name,@teamId,@docKey)",
+                new { id = p.Id, name = p.Name, teamId = doc.TeamId, docKey = doc.Key }, tx);
+        }
+
+        tx.Commit();
+    }
+
+    /// <summary>
+    /// Returns set of file keys already synced for this team (used to skip on resume).
+    /// </summary>
+    public HashSet<string> GetSyncedFileKeys(string teamId) =>
+        Conn().Query<string>("SELECT key FROM Documents WHERE team_id=@teamId", new { teamId }).ToHashSet();
+
+    /// <summary>
+    /// Removes files (and their pages/index) that no longer exist in Figma.
+    /// Called after a full team sync completes to clean up deleted files.
+    /// </summary>
+    public void RemoveDeletedFiles(string teamId, HashSet<string> currentFileKeys)
+    {
+        var existing = GetSyncedFileKeys(teamId);
+        var toDelete = existing.Except(currentFileKeys).ToList();
+        if (toDelete.Count == 0) return;
+
+        var c = Conn(); using var tx = c.BeginTransaction();
+        var inList = string.Join(",", toDelete.Select(k => $"'{k.Replace("'", "''")}'"));
+        c.Execute($"DELETE FROM Pages       WHERE document_key IN ({inList})", transaction: tx);
+        c.Execute($"DELETE FROM SearchIndex WHERE document_key IN ({inList})", transaction: tx);
+        c.Execute($"DELETE FROM Documents   WHERE key           IN ({inList})", transaction: tx);
+        c.Execute($"DELETE FROM SearchIndex WHERE entity_type='document' AND entity_id IN ({inList})", transaction: tx);
+        tx.Commit();
     }
     public (HashSet<string> docKeys, HashSet<string> pageIds) SearchRaw(string keyword)
     {

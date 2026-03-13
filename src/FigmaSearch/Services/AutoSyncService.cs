@@ -45,15 +45,24 @@ public class AutoSyncService : IDisposable
             var teams = _db.GetTeams();
             if (teams.Count == 0) return;
 
+            // Collect already-synced file keys across all teams for resume support
+            var alreadySynced = teams
+                .SelectMany(t => _db.GetSyncedFileKeys(t.TeamId))
+                .ToHashSet();
+
             var progress = new Progress<SyncProgress>(); // silent, no UI
 
-            // Pass onTeamSynced callback so each team is persisted immediately
             await _api.SyncAllTeamsAsync(
                 teams,
                 settings.FigmaApiKey,
                 progress,
-                onTeamSynced: (teamId, docs, pages) =>
-                    _db.ReplaceTeamData(teamId, docs, pages));
+                alreadySyncedKeys: alreadySynced,
+                onFileSynced:      (doc, pages) => _db.UpsertFileData(doc, pages),
+                onTeamFinished:    (teamId, currentKeys) =>
+                {
+                    _db.RemoveDeletedFiles(teamId, currentKeys);
+                    _db.SetLastSyncTime(DateTime.UtcNow);
+                });
         }
         catch (FigmaAuthException ex) { SyncFailed?.Invoke(ex); }
         catch (Exception ex)          { SyncFailed?.Invoke(ex); }

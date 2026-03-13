@@ -53,6 +53,11 @@
                             <Setter Property="Background" Value="{StaticResource BgHover}"/>
                             <Setter Property="Foreground" Value="{StaticResource FgPrimary}"/>
                         </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource FgDisabled}"/>
+                            <Setter Property="Cursor"     Value="Arrow"/>
+                            <Setter Property="Opacity"    Value="0.5"/>
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

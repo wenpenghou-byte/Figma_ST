@@ -57,12 +57,14 @@
                                     <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="NewTeamId" Grid.Column="0" Margin="0,0,4,0"
-                                         Style="{StaticResource SearchBox}" FontSize="13"/>
+                                         Style="{StaticResource SearchBox}" FontSize="13"
+                                         TextChanged="NewTeam_TextChanged"/>
                                 <TextBox x:Name="NewTeamName" Grid.Column="1" Margin="0,0,4,0"
-                                         Style="{StaticResource SearchBox}" FontSize="13"/>
-                                <Button Grid.Column="2" Content="+" Margin="0,0,4,0"
+                                         Style="{StaticResource SearchBox}" FontSize="13"
+                                         TextChanged="NewTeam_TextChanged"/>
+                                <Button x:Name="AddTeamBtn" Grid.Column="2" Content="写入" Margin="0,0,4,0"
                                         Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
-                                        Padding="12,6" Click="AddTeam_Click"/>
+                                        Padding="12,6" IsEnabled="False" Click="AddTeam_Click"/>
                                 <Button Grid.Column="3" Content="删除选中"
                                         Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
                                         Padding="12,6" Click="RemoveTeam_Click"/>

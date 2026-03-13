@@ -20,17 +20,52 @@ public class FigmaApiService
         _http.DefaultRequestHeaders.Add("User-Agent", "FigmaSearch/1.0");
     }
 
-    private async Task<JsonElement> GetAsync(string url, string token)
+    /// <summary>
+    /// GET with automatic retry on 429 / 5xx.
+    /// – 429: honours Retry-After header (or defaults to 60 s)
+    /// – 5xx: exponential back-off starting at 2 s, up to 5 attempts
+    /// </summary>
+    private async Task<JsonElement> GetAsync(string url, string token, CancellationToken ct = default)
     {
-        _http.DefaultRequestHeaders.Remove("X-Figma-Token");
-        _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Figma-Token", token);
-        var resp = await _http.GetAsync(url);
-        if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
-            resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            throw new FigmaAuthException("API Key API Key 无效或已过期，请在设置中更新");
-        resp.EnsureSuccessStatusCode();
-        var json = await resp.Content.ReadAsStringAsync();
-        return JsonDocument.Parse(json).RootElement;
+        const int maxAttempts = 5;
+        int attempt = 0;
+        while (true)
+        {
+            attempt++;
+            _http.DefaultRequestHeaders.Remove("X-Figma-Token");
+            _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Figma-Token", token);
+
+            var resp = await _http.GetAsync(url, ct);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                throw new FigmaAuthException("API Key 无效或已过期，请在设置中更新");
+
+            // Rate limited — wait then retry
+            if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                if (attempt >= maxAttempts) resp.EnsureSuccessStatusCode(); // throw after max
+                int wait = 60;
+                if (resp.Headers.TryGetValues("Retry-After", out var vals) &&
+                    int.TryParse(vals.FirstOrDefault(), out var ra))
+                    wait = ra;
+                await Task.Delay(TimeSpan.FromSeconds(wait + 2), ct);
+                continue;
+            }
+
+            // Server error — exponential back-off
+            if ((int)resp.StatusCode >= 500)
+            {
+                if (attempt >= maxAttempts) resp.EnsureSuccessStatusCode();
+                var backoff = TimeSpan.FromSeconds(Math.Pow(2, attempt)); // 2, 4, 8, 16 s
+                await Task.Delay(backoff, ct);
+                continue;
+            }
+
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            return JsonDocument.Parse(json).RootElement;
+        }
     }
 
     public async Task<bool> ValidateTokenAsync(string token)
@@ -41,16 +76,22 @@ public class FigmaApiService
     }
 
     /// <summary>
-    /// Syncs all teams. After each team completes, calls onTeamSynced(teamId, docs, pages)
-    /// so the caller can persist data immediately (e.g. DatabaseService.ReplaceTeamData).
+    /// Incremental sync: fetches all teams' files, persisting each file immediately.
+    /// Files already present in <paramref name="alreadySyncedKeys"/> are skipped (resume support).
+    /// After a team fully completes, calls <paramref name="onTeamFinished"/> so callers can
+    /// clean up deleted files.
     /// </summary>
     public async Task SyncAllTeamsAsync(
         List<TeamConfig> teams,
         string token,
         IProgress<SyncProgress> progress,
-        Action<string, List<FigmaFile>, List<FigmaPage>>? onTeamSynced = null,
+        HashSet<string>? alreadySyncedKeys = null,
+        Action<FigmaFile, List<FigmaPage>>? onFileSynced = null,
+        Action<string, HashSet<string>>? onTeamFinished = null,
         CancellationToken ct = default)
     {
+        alreadySyncedKeys ??= new HashSet<string>();
+
         for (int ti = 0; ti < teams.Count; ti++)
         {
             ct.ThrowIfCancellationRequested();
@@ -65,10 +106,10 @@ public class FigmaApiService
                 Detail   = team.DisplayName
             });
 
-            var teamDocs  = new List<FigmaFile>();
-            var teamPages = new List<FigmaPage>();
+            var teamFileKeys = new HashSet<string>(); // tracks all file keys seen for this team
+            int newFiles = 0, skippedFiles = 0;
 
-            var projectsDoc = await GetAsync($"{BASE}/teams/{team.TeamId}/projects", token);
+            var projectsDoc = await GetAsync($"{BASE}/teams/{team.TeamId}/projects", token, ct);
             var projects = projectsDoc.GetProperty("projects").EnumerateArray().ToList();
 
             for (int pi = 0; pi < projects.Count; pi++)
@@ -87,7 +128,7 @@ public class FigmaApiService
                     Detail   = projName
                 });
 
-                var filesDoc = await GetAsync($"{BASE}/projects/{projId}/files", token);
+                var filesDoc = await GetAsync($"{BASE}/projects/{projId}/files", token, ct);
                 var files = filesDoc.GetProperty("files").EnumerateArray().ToList();
 
                 for (int fi = 0; fi < files.Count; fi++)
@@ -98,6 +139,23 @@ public class FigmaApiService
                     var fileName = file.GetProperty("name").GetString() ?? "";
                     var fileUrl  = $"https://www.figma.com/file/{fileKey}";
 
+                    teamFileKeys.Add(fileKey);
+
+                    // ── RESUME: skip files already persisted ──
+                    if (alreadySyncedKeys.Contains(fileKey))
+                    {
+                        skippedFiles++;
+                        progress.Report(new SyncProgress
+                        {
+                            Phase    = "已跳过（上次已同步）",
+                            TeamName = team.DisplayName,
+                            Current  = fi + 1,
+                            Total    = files.Count,
+                            Detail   = fileName
+                        });
+                        continue;
+                    }
+
                     progress.Report(new SyncProgress
                     {
                         Phase    = "正在获取页面信息",
@@ -107,7 +165,7 @@ public class FigmaApiService
                         Detail   = fileName
                     });
 
-                    teamDocs.Add(new FigmaFile
+                    var doc = new FigmaFile
                     {
                         Key         = fileKey,
                         ProjectId   = projId,
@@ -115,19 +173,19 @@ public class FigmaApiService
                         TeamId      = team.TeamId,
                         Name        = fileName,
                         Url         = fileUrl
-                    });
+                    };
 
-                    // Fetch pages
+                    var filePages = new List<FigmaPage>();
                     try
                     {
-                        var detail   = await GetAsync($"{BASE}/files/{fileKey}?depth=1", token);
+                        var detail   = await GetAsync($"{BASE}/files/{fileKey}?depth=1", token, ct);
                         var children = detail.GetProperty("document").GetProperty("children").EnumerateArray();
                         foreach (var page in children)
                         {
                             var pageId   = page.GetProperty("id").GetString() ?? "";
                             var pageName = page.GetProperty("name").GetString() ?? "";
                             var nodeId   = pageId.Replace(":", "%3A");
-                            teamPages.Add(new FigmaPage
+                            filePages.Add(new FigmaPage
                             {
                                 Id          = pageId,
                                 DocumentKey = fileKey,
@@ -136,14 +194,19 @@ public class FigmaApiService
                             });
                         }
                     }
-                    catch (Exception ex) when (ex is not FigmaAuthException) { /* skip pages on error */ }
+                    catch (Exception ex) when (ex is not FigmaAuthException && ex is not OperationCanceledException) { /* skip pages on error */ }
+
+                    // ── Persist immediately after each file ──
+                    onFileSynced?.Invoke(doc, filePages);
+                    alreadySyncedKeys.Add(fileKey);
+                    newFiles++;
 
                     await Task.Delay(200, ct); // respect rate limits
                 }
             }
 
-            // Persist this team's data immediately after it finishes
-            onTeamSynced?.Invoke(team.TeamId, teamDocs, teamPages);
+            // Notify caller so it can clean up files deleted from Figma
+            onTeamFinished?.Invoke(team.TeamId, teamFileKeys);
 
             progress.Report(new SyncProgress
             {
@@ -151,7 +214,7 @@ public class FigmaApiService
                 TeamName = team.DisplayName,
                 Current  = ti + 1,
                 Total    = teams.Count,
-                Detail   = $"{teamDocs.Count} 个文档, {teamPages.Count} 个页面"
+                Detail   = $"新增/更新 {newFiles} 个文件，跳过 {skippedFiles} 个"
             });
         }
 
@@ -163,3 +226,4 @@ public class FigmaApiService
         });
     }
 }
+

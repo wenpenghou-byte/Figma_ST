@@ -65,6 +65,14 @@ public partial class SettingsWindow : Window
         _vm.AddTeam(id, name);
         NewTeamId.Text = "";
         NewTeamName.Text = "";
+        // Button will be disabled again via TextChanged
+    }
+
+    private void NewTeam_TextChanged(object s, TextChangedEventArgs e)
+    {
+        if (AddTeamBtn == null) return;
+        AddTeamBtn.IsEnabled = !string.IsNullOrWhiteSpace(NewTeamId.Text)
+                             && !string.IsNullOrWhiteSpace(NewTeamName.Text);
     }
 
     private void RemoveTeam_Click(object s, RoutedEventArgs e)
@@ -85,7 +93,7 @@ public partial class SettingsWindow : Window
     private async void ManualSync_Click(object s, RoutedEventArgs e)
     {
         SyncProgressBar.Visibility = Visibility.Visible;
-        SyncStatus.Text = "同步中...";
+        SyncStatus.Text = "同步中...（大约需要 3-5 分钟）";
         try
         {
             var teams = App.DB.GetTeams();
@@ -95,7 +103,11 @@ public partial class SettingsWindow : Window
                 return;
             }
 
-            // Dispatch progress updates back to UI thread
+            // Collect already-synced keys for resume support
+            var alreadySynced = teams
+                .SelectMany(t => App.DB.GetSyncedFileKeys(t.TeamId))
+                .ToHashSet();
+
             var progress = new Progress<FigmaSearch.Models.SyncProgress>(p =>
             {
                 Dispatcher.Invoke(() =>
@@ -104,13 +116,17 @@ public partial class SettingsWindow : Window
                 });
             });
 
-            // onTeamSynced callback persists each team as it completes
             await App.Api.SyncAllTeamsAsync(
                 teams,
                 _vm.FigmaApiKey,
                 progress,
-                onTeamSynced: (teamId, docs, pages) =>
-                    App.DB.ReplaceTeamData(teamId, docs, pages));
+                alreadySyncedKeys: alreadySynced,
+                onFileSynced:      (doc, pages) => App.DB.UpsertFileData(doc, pages),
+                onTeamFinished:    (teamId, currentKeys) =>
+                {
+                    App.DB.RemoveDeletedFiles(teamId, currentKeys);
+                    App.DB.SetLastSyncTime(DateTime.UtcNow);
+                });
 
             SyncStatus.Text = $"同步完成！共 {App.DB.GetDocumentCount()} 个文档";
             UpdateDbStats();
@@ -122,7 +138,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            SyncStatus.Text = $"同步失败：{ex.Message}";
+            SyncStatus.Text = $"同步中断：{ex.Message}（已保存进度，可重新点击继续）";
         }
         finally { SyncProgressBar.Visibility = Visibility.Collapsed; }
     }
