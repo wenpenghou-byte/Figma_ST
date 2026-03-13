@@ -25,6 +25,10 @@ public partial class SettingsWindow : Window
         IntervalLabel.Text = $"{_vm.UpdateIntervalHours} 小时";
         StartupCheck.IsChecked = _vm.LaunchAtStartup;
         HotkeyBox.Text = FormatConfigForDisplay(_vm.HotkeyConfig);
+        // Set theme combo selection without triggering the change handler
+        ThemeCombo.SelectionChanged -= ThemeCombo_Changed;
+        ThemeCombo.SelectedIndex = _vm.Theme == "Light" ? 1 : 0;
+        ThemeCombo.SelectionChanged += ThemeCombo_Changed;
         UpdateDbStats();
     }
 
@@ -107,6 +111,14 @@ public partial class SettingsWindow : Window
 
     private void StartupCheck_Changed(object s, RoutedEventArgs e) =>
         _vm.LaunchAtStartup = StartupCheck.IsChecked == true;
+
+    private void ThemeCombo_Changed(object s, SelectionChangedEventArgs e)
+    {
+        if (ThemeCombo.SelectedItem is not System.Windows.Controls.ComboBoxItem item) return;
+        var theme = item.Tag as string ?? "Dark";
+        _vm.Theme = theme;
+        App.ApplyTheme(theme, persist: false); // persist on Save
+    }
 
     // ── Hotkey recorder ──────────────────────────────────────────
 

@@ -37,6 +37,12 @@ public class SettingsViewModel : INotifyPropertyChanged
         set { _settings.HotkeyConfig = value; OnPropertyChanged(); }
     }
 
+    public string Theme
+    {
+        get => _settings.Theme;
+        set { _settings.Theme = value; OnPropertyChanged(); }
+    }
+
     public SettingsViewModel(DatabaseService db)
     {
         _db = db;

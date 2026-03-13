@@ -86,6 +86,15 @@
                 <CheckBox x:Name="StartupCheck" Content="开机启动"
                           Foreground="{StaticResource FgPrimary}" Margin="0,0,0,16"
                           Checked="StartupCheck_Changed" Unchecked="StartupCheck_Changed"/>
+                <!-- Theme -->
+                <StackPanel Margin="0,0,0,16">
+                    <TextBlock Text="界面主题" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+                    <ComboBox x:Name="ThemeCombo" Width="160" HorizontalAlignment="Left"
+                              SelectionChanged="ThemeCombo_Changed">
+                        <ComboBoxItem Content="深色" Tag="Dark"/>
+                        <ComboBoxItem Content="浅色" Tag="Light"/>
+                    </ComboBox>
+                </StackPanel>
                 <!-- Hotkey -->
                 <StackPanel Margin="0,0,0,16">
                     <TextBlock Text="唤醒搜索框快捷键" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
