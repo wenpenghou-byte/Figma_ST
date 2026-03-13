@@ -79,7 +79,7 @@ public partial class SearchWindow : Window
     private void ShowSyncProgress(string text)
     {
         SyncStatusBar.Visibility = Visibility.Visible;
-        SyncStatusBar.Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x32, 0x4A)); // subtle blue
+        SyncStatusBar.Background = (Brush)FindResource("SyncProgressBg");
         SyncStatusIcon.Text = "⟳";
         SyncStatusIcon.Foreground = (Brush)FindResource("AccentBlue");
         SyncStatusText.Text = text;
@@ -89,7 +89,7 @@ public partial class SearchWindow : Window
     private void ShowSyncSuccess(string text)
     {
         SyncStatusBar.Visibility = Visibility.Visible;
-        SyncStatusBar.Background = new SolidColorBrush(Color.FromRgb(0x1A, 0x30, 0x1A)); // subtle green
+        SyncStatusBar.Background = (Brush)FindResource("SyncSuccessBg");
         SyncStatusIcon.Text = "✓";
         SyncStatusIcon.Foreground = (Brush)FindResource("SuccessGreen");
         SyncStatusText.Text = text;
@@ -99,11 +99,11 @@ public partial class SearchWindow : Window
     private void ShowSyncError(string text)
     {
         SyncStatusBar.Visibility = Visibility.Visible;
-        SyncStatusBar.Background = new SolidColorBrush(Color.FromRgb(0x3D, 0x1A, 0x1A)); // subtle red
+        SyncStatusBar.Background = (Brush)FindResource("SyncErrorBg");
         SyncStatusIcon.Text = "✗";
         SyncStatusIcon.Foreground = (Brush)FindResource("ErrorRed");
         SyncStatusText.Text = text;
-        SyncStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xAA, 0xAA));
+        SyncStatusText.Foreground = (Brush)FindResource("ErrorTextLight");
     }
 
     private void HideSyncBar()

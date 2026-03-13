@@ -54,7 +54,7 @@ public class HighlightText : TextBlock
             if (idx > start) Inlines.Add(new Run(text[start..idx]));
             Inlines.Add(new Run(text[idx..(idx + keyword.Length)])
             {
-                Foreground = Brushes.DodgerBlue,
+                Foreground = TryFindResource("KeywordColor") as Brush ?? Brushes.DodgerBlue,
                 FontWeight = FontWeights.SemiBold
             });
             start = idx + keyword.Length;

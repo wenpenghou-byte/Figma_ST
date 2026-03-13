@@ -11,8 +11,8 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
     </Window.Resources>
-    <Border Background="{StaticResource BgPrimary}"
-            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="12">
+    <Border Background="{DynamicResource BgPrimary}"
+            BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" CornerRadius="12">
         <Border.Effect>
             <DropShadowEffect BlurRadius="30" ShadowDepth="8" Color="#000000" Opacity="0.6" Direction="270"/>
         </Border.Effect>
@@ -31,31 +31,31 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="&#128269;" VerticalAlignment="Center" Margin="0,0,8,0" FontSize="16" Opacity="0.5"/>
-                <TextBox x:Name="SearchBox" Grid.Column="1" Style="{StaticResource SearchBoxWithHint}"
+                <TextBox x:Name="SearchBox" Grid.Column="1" Style="{DynamicResource SearchBoxWithHint}"
                          Background="Transparent" TextChanged="SearchBox_TextChanged"/>
-                <Button x:Name="UpdateBtn" Grid.Column="2" Style="{StaticResource UpdateButton}"
+                <Button x:Name="UpdateBtn" Grid.Column="2" Style="{DynamicResource UpdateButton}"
                         Visibility="Collapsed" Click="UpdateBtn_Click" Margin="8,0,0,0">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#26356;&#26032; "/>
-                        <Border Background="#E53935" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
+                        <Border Background="{DynamicResource UpdateBadgeBg}" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
                             <TextBlock Text="NEW" FontSize="9" Foreground="White" FontWeight="Bold"/>
                         </Border>
                     </StackPanel>
                 </Button>
             </Grid>
             <!-- API Key error bar -->
-            <Border x:Name="ApiErrorBar" Grid.Row="1" Background="#7B1515" Visibility="Collapsed" Padding="14,7">
+            <Border x:Name="ApiErrorBar" Grid.Row="1" Background="{DynamicResource ApiErrorBg}" Visibility="Collapsed" Padding="14,7">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="API Key &#24050;&#22833;&#25928;&#65292;&#35831;&#26356;&#26032;&#21518;&#37325;&#35797;" Foreground="#FFCCCC" VerticalAlignment="Center" FontSize="12"/>
-                    <Button Grid.Column="1" Content="&#21069;&#24448;&#35774;&#32622;" Style="{StaticResource FlatButton}" Foreground="#FF8A80" Click="ApiErrorGotoSettings_Click"/>
+                    <TextBlock Text="API Key &#24050;&#22833;&#25928;&#65292;&#35831;&#26356;&#26032;&#21518;&#37325;&#35797;" Foreground="{DynamicResource ApiErrorFg}" VerticalAlignment="Center" FontSize="12"/>
+                    <Button Grid.Column="1" Content="&#21069;&#24448;&#35774;&#32622;" Style="{DynamicResource FlatButton}" Foreground="{DynamicResource ApiErrorBtn}" Click="ApiErrorGotoSettings_Click"/>
                 </Grid>
             </Border>
             <!-- Results -->
-            <Border x:Name="ResultsArea" Grid.Row="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Visibility="Collapsed">
+            <Border x:Name="ResultsArea" Grid.Row="2" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0" Visibility="Collapsed">
                 <ScrollViewer x:Name="ResultsScroll" MaxHeight="520"
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               PreviewMouseWheel="ResultsScroll_PreviewMouseWheel">
