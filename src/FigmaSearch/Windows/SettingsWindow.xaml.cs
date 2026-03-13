@@ -91,59 +91,34 @@ public partial class SettingsWindow : Window
     private void StartupCheck_Changed(object s, RoutedEventArgs e) =>
         _vm.LaunchAtStartup = StartupCheck.IsChecked == true;
 
-    private async void ManualSync_Click(object s, RoutedEventArgs e)
+    private void ManualSync_Click(object s, RoutedEventArgs e)
     {
-        SyncProgressBar.Visibility = Visibility.Visible;
-        SyncStatus.Text = "同步中...（大约需要 3-5 分钟）";
-        try
+        if (App.AutoSync == null) return;
+        if (App.AutoSync.IsSyncing)
         {
-            var teams = App.DB.GetTeams();
-            if (teams.Count == 0)
-            {
-                SyncStatus.Text = "请先添加 Team ID";
-                return;
-            }
-
-            // Collect already-synced keys for resume support
-            var alreadySynced = teams
-                .SelectMany(t => App.DB.GetSyncedFileKeys(t.TeamId))
-                .ToHashSet();
-
-            var progress = new Progress<FigmaSearch.Models.SyncProgress>(p =>
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    SyncDetailText.Text = $"[{p.TeamName}] {p.Phase}: {p.Detail}";
-                });
-            });
-
-            await App.Api.SyncAllTeamsAsync(
-                teams,
-                _vm.FigmaApiKey,
-                progress,
-                alreadySyncedKeys: alreadySynced,
-                onFileSynced:      (doc, pages) => App.DB.UpsertFileData(doc, pages),
-                onTeamFinished:    (teamId, currentKeys) =>
-                {
-                    App.DB.RemoveDeletedFiles(teamId, currentKeys);
-                    App.DB.SetLastSyncTime(DateTime.UtcNow);
-                });
-
-            SyncStatus.Text = $"同步完成！共 {App.DB.GetDocumentCount()} 个文档";
-            UpdateDbStats();
+            SyncStatus.Text = "同步正在进行中…";
+            return;
         }
-        catch (FigmaAuthException ex)
+
+        var teams = App.DB.GetTeams();
+        if (teams.Count == 0)
         {
-            SyncStatus.Text = $"错误：{ex.Message}";
-            ApiKeyBox.BorderBrush = (Brush)FindResource("ErrorRed");
+            SyncStatus.Text = "请先添加 Team ID";
+            return;
         }
-        catch (Exception ex)
-        {
-            SyncStatus.Text = $"同步中断：{ex.Message}（已保存进度，可重新点击继续）";
-        }
-        finally { SyncProgressBar.Visibility = Visibility.Collapsed; }
+
+        // Save current settings first so sync uses latest config
+        _vm.Save();
+        App.AutoSync.RunNow();
+        SyncStatus.Text = "已在后台开始同步，进度可在搜索框中查看";
     }
 
-    private void Save_Click(object s, RoutedEventArgs e) { _vm.Save(); Close(); }
+    private void Save_Click(object s, RoutedEventArgs e)
+    {
+        _vm.Save();
+        // Trigger background sync so new/changed teams are fetched immediately
+        App.AutoSync?.RunNow();
+        Close();
+    }
     private void Cancel_Click(object s, RoutedEventArgs e) => Close();
 }

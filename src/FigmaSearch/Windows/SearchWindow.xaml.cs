@@ -14,6 +14,7 @@ public partial class SearchWindow : Window
     private readonly SearchViewModel _vm;
     private UpdateInfo? _pendingUpdate;
     private bool _hasBeenShown;
+    private string? _syncErrorMessage;
 
     public SearchWindow()
     {
@@ -21,6 +22,102 @@ public partial class SearchWindow : Window
         _vm = new SearchViewModel(App.DB);
         DataContext = _vm;
     }
+
+    /// <summary>
+    /// Bind to AutoSyncService events for live sync progress in the search window.
+    /// Called once from App.OnStartup after both SearchWindow and AutoSync are created.
+    /// </summary>
+    public void BindSyncService(AutoSyncService sync)
+    {
+        sync.SyncProgressChanged += p =>
+            Dispatcher.BeginInvoke(() => OnSyncProgress(p));
+        sync.SyncCompleted += success =>
+            Dispatcher.BeginInvoke(() => OnSyncCompleted(success));
+        sync.SyncFailed += ex =>
+            Dispatcher.BeginInvoke(() => OnSyncError(ex));
+
+        // If sync is already running (unlikely but safe), show the bar
+        if (sync.IsSyncing)
+            ShowSyncProgress("正在同步文档…（视文档数量，可能需要几分钟到几十分钟，已拉取的文档可搜索）");
+    }
+
+    // ── Sync status display ──────────────────────────────────────
+
+    private void OnSyncProgress(SyncProgress p)
+    {
+        _syncErrorMessage = null; // clear any previous error while syncing
+        var detail = string.IsNullOrEmpty(p.Detail) ? "" : $" · {p.Detail}";
+        ShowSyncProgress($"正在同步{detail}（视文档数量，可能需要几分钟到几十分钟，已拉取的文档可搜索）");
+    }
+
+    private void OnSyncCompleted(bool success)
+    {
+        if (success)
+        {
+            _syncErrorMessage = null;
+            ShowSyncSuccess($"同步完成，共 {App.DB.GetDocumentCount()} 个文档");
+            // Auto-hide after 5 seconds
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            timer.Tick += (_, _) => { timer.Stop(); HideSyncBar(); };
+            timer.Start();
+        }
+        // If not success but no error message set, it was cancelled — just hide
+        else if (_syncErrorMessage == null)
+        {
+            HideSyncBar();
+        }
+    }
+
+    private void OnSyncError(Exception ex)
+    {
+        _syncErrorMessage = ex is FigmaAuthException
+            ? "同步失败：API Key 无效或已过期，请在设置中更新"
+            : $"同步失败：{ex.Message}";
+        ShowSyncError(_syncErrorMessage);
+    }
+
+    private void ShowSyncProgress(string text)
+    {
+        SyncStatusBar.Visibility = Visibility.Visible;
+        SyncStatusBar.Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x32, 0x4A)); // subtle blue
+        SyncStatusIcon.Text = "⟳";
+        SyncStatusIcon.Foreground = (Brush)FindResource("AccentBlue");
+        SyncStatusText.Text = text;
+        SyncStatusText.Foreground = (Brush)FindResource("FgSecondary");
+    }
+
+    private void ShowSyncSuccess(string text)
+    {
+        SyncStatusBar.Visibility = Visibility.Visible;
+        SyncStatusBar.Background = new SolidColorBrush(Color.FromRgb(0x1A, 0x30, 0x1A)); // subtle green
+        SyncStatusIcon.Text = "✓";
+        SyncStatusIcon.Foreground = (Brush)FindResource("SuccessGreen");
+        SyncStatusText.Text = text;
+        SyncStatusText.Foreground = (Brush)FindResource("SuccessGreen");
+    }
+
+    private void ShowSyncError(string text)
+    {
+        SyncStatusBar.Visibility = Visibility.Visible;
+        SyncStatusBar.Background = new SolidColorBrush(Color.FromRgb(0x3D, 0x1A, 0x1A)); // subtle red
+        SyncStatusIcon.Text = "✗";
+        SyncStatusIcon.Foreground = (Brush)FindResource("ErrorRed");
+        SyncStatusText.Text = text;
+        SyncStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xAA, 0xAA));
+    }
+
+    private void HideSyncBar()
+    {
+        // Only hide if there's no persistent error
+        if (_syncErrorMessage != null)
+        {
+            ShowSyncError(_syncErrorMessage);
+            return;
+        }
+        SyncStatusBar.Visibility = Visibility.Collapsed;
+    }
+
+    // ── Existing functionality ───────────────────────────────────
 
     public void Toggle()
     {
@@ -38,6 +135,13 @@ public partial class SearchWindow : Window
         base.Show();
         SearchBox.Focus();
         Activate();
+
+        // Restore persistent error if any
+        if (_syncErrorMessage != null)
+            ShowSyncError(_syncErrorMessage);
+        // Or show progress if sync is running
+        else if (App.AutoSync?.IsSyncing == true)
+            ShowSyncProgress("正在同步文档…（视文档数量，可能需要几分钟到几十分钟，已拉取的文档可搜索）");
     }
 
     private void HideWindow()
@@ -181,13 +285,8 @@ public partial class SearchWindow : Window
 
     private void Window_Deactivated(object s, EventArgs e)
     {
-        // Never hide if this window has not been explicitly shown yet
         if (!_hasBeenShown) return;
-
-        // Never hide if the Settings window is open (regardless of its active/visible state at this instant)
         if (App.IsSettingsOpen) return;
-
-        // Don't hide if another app window is currently active or visible
         foreach (Window w in Application.Current.Windows)
         {
             if (w == this) continue;

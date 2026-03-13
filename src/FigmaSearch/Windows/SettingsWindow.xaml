@@ -95,12 +95,6 @@
                         <TextBlock x:Name="SyncStatus" Margin="12,0,0,0"
                                    Foreground="{StaticResource FgSecondary}" VerticalAlignment="Center" FontSize="12"/>
                     </StackPanel>
-                    <ProgressBar x:Name="SyncProgressBar" Height="4" Margin="0,8,0,0"
-                                 Visibility="Collapsed" IsIndeterminate="True"
-                                 Background="{StaticResource BgHover}"
-                                 Foreground="{StaticResource AccentBlue}"/>
-                    <TextBlock x:Name="SyncDetailText" Foreground="{StaticResource FgDisabled}"
-                               FontSize="11" Margin="0,4,0,0"/>
                     <TextBlock x:Name="DbStats" Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,8,0,0"/>
                 </StackPanel>
             </StackPanel>
