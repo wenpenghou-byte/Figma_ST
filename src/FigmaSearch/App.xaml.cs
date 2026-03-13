@@ -44,37 +44,34 @@ public partial class App : Application
             wizard.ShowDialog();
             settings = DB.LoadSettings();
             // Exit if user closed wizard without completing setup
-            // (no API key OR no teams means nothing was configured at all)
             if (string.IsNullOrEmpty(settings.FigmaApiKey) || DB.GetTeams().Count == 0)
             {
-                // Setup incomplete — clean shutdown so user can relaunch
                 Shutdown();
                 return;
-            }
-            // If IsFirstRun is still true here, sync was interrupted but key+teams are saved.
-            // Fall through and start normally — user can trigger sync from Settings.
-            if (settings.IsFirstRun)
-            {
-                settings.IsFirstRun = false;
-                DB.SaveSettings(settings);
             }
         }
 
         // Build tray icon
         _trayIcon = BuildTrayIcon();
 
-        // Search window (hidden initially, created AFTER setup is confirmed complete)
+        // Search window (hidden initially)
         SearchWin = new SearchWindow();
 
         // Hotkey
         Hotkey = new HotkeyService(Dispatcher);
         Hotkey.DoubleAltPressed += (_, _) => SearchWin.Toggle();
 
-        // Auto sync
+        // Auto sync — SearchWindow subscribes to events for live progress display
         AutoSync = new AutoSyncService(DB, Api);
         AutoSync.SyncFailed += OnSyncFailed;
+        SearchWin.BindSyncService(AutoSync);
+
         if (!string.IsNullOrEmpty(settings.FigmaApiKey))
+        {
             AutoSync.Start(settings.UpdateIntervalHours);
+            // Trigger immediate sync (first run or periodic check)
+            AutoSync.RunNow();
+        }
 
         // Version check (once per day)
         var today = DateTime.Today.ToString("yyyy-MM-dd");
@@ -128,7 +125,6 @@ public partial class App : Application
     {
         if (_settingsWindow != null)
         {
-            // Already open — bring it to front
             if (!_settingsWindow.IsVisible) _settingsWindow.Show();
             _settingsWindow.Activate();
             return;
