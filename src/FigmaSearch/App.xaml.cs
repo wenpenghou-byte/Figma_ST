@@ -74,14 +74,8 @@ public partial class App : Application
             AutoSync.RunNow();
         }
 
-        // Version check (once per day)
-        var today = DateTime.Today.ToString("yyyy-MM-dd");
-        if (settings.LastUpdateCheckDate != today)
-        {
-            settings.LastUpdateCheckDate = today;
-            DB.SaveSettings(settings);
-            _ = CheckForUpdateAsync();
-        }
+        // Version check (every startup)
+        _ = CheckForUpdateAsync();
     }
 
     private async System.Threading.Tasks.Task CheckForUpdateAsync()
