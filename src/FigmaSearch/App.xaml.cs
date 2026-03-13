@@ -37,6 +37,9 @@ public partial class App : Application
 
         var settings = DB.LoadSettings();
 
+        // Apply saved theme before any window is created
+        ApplyTheme(settings.Theme, persist: false);
+
         // First run: show wizard
         if (settings.IsFirstRun)
         {
@@ -128,6 +131,25 @@ public partial class App : Application
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         _settingsWindow.Activate();
+    }
+
+    /// <summary>
+    /// Switch application theme at runtime. All DynamicResource bindings update immediately.
+    /// </summary>
+    /// <param name="theme">"Dark" or "Light"</param>
+    /// <param name="persist">Whether to save the preference to the database.</param>
+    public static void ApplyTheme(string theme, bool persist = true)
+    {
+        var file = theme == "Light" ? "LightTheme.xaml" : "DarkTheme.xaml";
+        var uri  = new Uri($"Resources/Themes/{file}", UriKind.Relative);
+        var dict = new ResourceDictionary { Source = uri };
+        Current.Resources.MergedDictionaries[0] = dict;
+        if (persist)
+        {
+            var s = DB.LoadSettings();
+            s.Theme = theme;
+            DB.SaveSettings(s);
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
