@@ -71,6 +71,12 @@ public partial class FirstRunWizard : Window
         App.DB.SaveTeams(_teams);
         StartupManager.Set(settings.LaunchAtStartup);
 
+        MessageBox.Show(
+            "配置完成！文档数据正在后台同步中。\n\n双击左 Alt 可唤醒搜索框，已完成同步的文档可立即搜索。",
+            "开始使用",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+
         // Close immediately — sync will happen in background via AutoSyncService
         Close();
     }
