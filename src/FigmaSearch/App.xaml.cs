@@ -57,9 +57,10 @@ public partial class App : Application
         // Search window (hidden initially)
         SearchWin = new SearchWindow();
 
-        // Hotkey
+        // Hotkey — configurable via settings
         Hotkey = new HotkeyService(Dispatcher);
-        Hotkey.DoubleAltPressed += (_, _) => SearchWin.Toggle();
+        Hotkey.HotkeyPressed += (_, _) => SearchWin.Toggle();
+        Hotkey.ApplyConfig(settings.HotkeyConfig);
 
         // Auto sync — SearchWindow subscribes to events for live progress display
         AutoSync = new AutoSyncService(DB, Api);
