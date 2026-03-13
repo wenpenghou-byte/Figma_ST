@@ -54,7 +54,8 @@ public class DatabaseService : IDisposable
             HotkeyConfig        = GetSetting("hotkey_config") ?? "DoubleAlt",
             LastUpdateCheckDate = GetSetting("last_update_check_date") ?? "",
             AppVersion          = GetSetting("app_version") ?? "1.0.0",
-            IsFirstRun          = GetSetting("is_first_run") != "0"
+            IsFirstRun          = GetSetting("is_first_run") != "0",
+            Theme               = GetSetting("theme") ?? "Dark"
         };
         if (DateTime.TryParse(GetSetting("last_sync_time"), out var dt)) s.LastSyncTime = dt;
         return s;
@@ -69,6 +70,7 @@ public class DatabaseService : IDisposable
         SetSetting("app_version",            s.AppVersion);
         SetSetting("is_first_run",           s.IsFirstRun ? "1" : "0");
         SetSetting("last_sync_time",         s.LastSyncTime?.ToString("o") ?? "");
+        SetSetting("theme",                  s.Theme);
     }
 
     public List<TeamConfig> GetTeams() =>

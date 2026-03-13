@@ -10,4 +10,5 @@ public class AppSettings
     public string LastUpdateCheckDate { get; set; } = string.Empty;
     public string AppVersion { get; set; } = "1.0.0";
     public bool IsFirstRun { get; set; } = true;
+    public string Theme { get; set; } = "Dark"; // "Dark" | "Light"
 }
