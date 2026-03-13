@@ -3,6 +3,7 @@
 !include "LogicLib.nsh"
 
 !define PRODUCT_NAME     "FigmaSearch"
+!define PRODUCT_SHORTCUT "肥姑妈搜"
 !ifndef PRODUCT_VERSION
   !define PRODUCT_VERSION  "1.0.0"
 !endif
@@ -58,12 +59,12 @@ Section "FigmaSearch Core" SEC_MAIN
 SectionEnd
 
 Section /o "Desktop Shortcut" SEC_DESKTOP
-    CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\FigmaSearch.exe"
+    CreateShortcut "$DESKTOP\${PRODUCT_SHORTCUT}.lnk" "$INSTDIR\FigmaSearch.exe"
 SectionEnd
 
 Section /o "Start Menu Shortcut" SEC_STARTMENU
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\FigmaSearch.exe"
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_SHORTCUT}.lnk" "$INSTDIR\FigmaSearch.exe"
 SectionEnd
 
 Section /o "Run at Startup" SEC_STARTUP
@@ -91,8 +92,8 @@ Section "Uninstall"
         RMDir /r "$INSTDIR"
 
     ; Remove shortcuts
-    Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
-    Delete "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk"
+    Delete "$DESKTOP\${PRODUCT_SHORTCUT}.lnk"
+    Delete "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_SHORTCUT}.lnk"
     RMDir  "$SMPROGRAMS\${PRODUCT_NAME}"
 
     ; Remove AppData folder (database, settings)
