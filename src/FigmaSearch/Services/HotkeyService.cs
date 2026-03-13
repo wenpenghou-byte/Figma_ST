@@ -16,7 +16,9 @@ public class HotkeyService : IDisposable
     // ── Win32 constants ──
     private const int WH_KEYBOARD_LL = 13;
     private const int WM_KEYDOWN     = 0x0100;
+    private const int WM_KEYUP       = 0x0101;
     private const int WM_SYSKEYDOWN  = 0x0104;
+    private const int WM_SYSKEYUP    = 0x0105;
     private const int WM_HOTKEY      = 0x0312;
     private const int VK_LMENU       = 0xA4;
     private const int HOTKEY_ID      = 0x4653; // "FS"
@@ -26,9 +28,11 @@ public class HotkeyService : IDisposable
     private string _currentConfig = "DoubleAlt";
 
     // Low-level hook state (for DoubleAlt)
+    // Requires full press-release-press cycle to avoid triggering on key repeat
     private IntPtr _hookId = IntPtr.Zero;
     private LowLevelKeyboardProc? _proc;
-    private DateTime _lastAltPress = DateTime.MinValue;
+    private DateTime _lastAltRelease = DateTime.MinValue;
+    private bool _altIsDown;
     private readonly TimeSpan _doubleTapInterval = TimeSpan.FromMilliseconds(300);
 
     // RegisterHotKey state (for modifier+key combos)
@@ -117,19 +121,33 @@ public class HotkeyService : IDisposable
         if (nCode >= 0)
         {
             int vk = Marshal.ReadInt32(lParam);
-            bool isDown = wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN;
-            if (vk == VK_LMENU && isDown)
+            if (vk == VK_LMENU)
             {
-                var now = DateTime.Now;
-                if ((now - _lastAltPress) < _doubleTapInterval)
+                bool isDown = wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN;
+                bool isUp   = wParam == (IntPtr)WM_KEYUP   || wParam == (IntPtr)WM_SYSKEYUP;
+
+                if (isDown && !_altIsDown)
                 {
-                    _lastAltPress = DateTime.MinValue;
-                    _dispatcher.BeginInvoke(() => HotkeyPressed?.Invoke(this, EventArgs.Empty));
+                    // First real press (not auto-repeat, since _altIsDown guards that)
+                    _altIsDown = true;
+                    var now = DateTime.Now;
+                    if ((now - _lastAltRelease) < _doubleTapInterval)
+                    {
+                        // Second press within interval after previous release = double tap
+                        _lastAltRelease = DateTime.MinValue;
+                        _dispatcher.BeginInvoke(() => HotkeyPressed?.Invoke(this, EventArgs.Empty));
+                    }
                 }
-                else
+                else if (isUp)
                 {
-                    _lastAltPress = now;
+                    _altIsDown = false;
+                    _lastAltRelease = DateTime.Now;
                 }
+            }
+            else
+            {
+                // Any other key pressed while Alt is held — not a clean double-tap
+                _lastAltRelease = DateTime.MinValue;
             }
         }
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
