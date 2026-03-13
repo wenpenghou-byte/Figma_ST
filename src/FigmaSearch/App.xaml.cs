@@ -14,14 +14,22 @@ public partial class App : Application
     public static HotkeyService   Hotkey { get; private set; } = null!;
     public static SearchWindow    SearchWin { get; private set; } = null!;
     private TaskbarIcon? _trayIcon;
+    // Keep mutex alive for the process lifetime to prevent second instance
+    private static System.Threading.Mutex? _instanceMutex;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
         // Single instance check
-        var mutex = new System.Threading.Mutex(true, "FigmaSearch_SingleInstance", out bool isNew);
-        if (!isNew) { Shutdown(); return; }
+        _instanceMutex = new System.Threading.Mutex(true, "FigmaSearch_SingleInstance", out bool isNew);
+        if (!isNew)
+        {
+            _instanceMutex.Dispose();
+            _instanceMutex = null;
+            Shutdown();
+            return;
+        }
 
         DB      = new DatabaseService();
         Api     = new FigmaApiService();
@@ -34,11 +42,13 @@ public partial class App : Application
         {
             var wizard = new FirstRunWizard();
             wizard.ShowDialog();
-            // After wizard closes, check that setup is complete (API key + at least one team).
-            // If not, the user closed/exited without finishing — shut down entirely.
             settings = DB.LoadSettings();
             if (string.IsNullOrEmpty(settings.FigmaApiKey) || DB.GetTeams().Count == 0)
             {
+                // Setup incomplete — release mutex so user can relaunch
+                _instanceMutex.ReleaseMutex();
+                _instanceMutex.Dispose();
+                _instanceMutex = null;
                 Shutdown();
                 return;
             }
@@ -47,7 +57,7 @@ public partial class App : Application
         // Build tray icon
         _trayIcon = BuildTrayIcon();
 
-        // Search window (hidden initially)
+        // Search window (hidden initially, created AFTER setup is confirmed complete)
         SearchWin = new SearchWindow();
 
         // Hotkey
@@ -108,16 +118,22 @@ public partial class App : Application
 
     private static SettingsWindow? _settingsWindow;
 
+    /// <summary>True while the Settings window is instantiated (open or in the process of opening).</summary>
+    public static bool IsSettingsOpen => _settingsWindow != null;
+
     public static void OpenSettings()
     {
-        if (_settingsWindow != null && _settingsWindow.IsLoaded)
+        if (_settingsWindow != null)
         {
+            // Already open — bring it to front
+            if (!_settingsWindow.IsVisible) _settingsWindow.Show();
             _settingsWindow.Activate();
             return;
         }
         _settingsWindow = new SettingsWindow();
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
+        _settingsWindow.Activate();
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -126,6 +142,8 @@ public partial class App : Application
         Hotkey?.Dispose();
         AutoSync?.Dispose();
         DB?.Dispose();
+        try { _instanceMutex?.ReleaseMutex(); } catch { }
+        _instanceMutex?.Dispose();
         base.OnExit(e);
     }
 }

@@ -22,10 +22,13 @@ public class FigmaApiService
 
     /// <summary>
     /// GET with automatic retry on 429 / 5xx.
+    /// – 401/403 on /me → FigmaAuthException (real auth failure)
+    /// – 403 on a file endpoint → throws HttpRequestException (caller treats as skip)
     /// – 429: honours Retry-After header (or defaults to 60 s)
     /// – 5xx: exponential back-off starting at 2 s, up to 5 attempts
     /// </summary>
-    private async Task<JsonElement> GetAsync(string url, string token, CancellationToken ct = default)
+    private async Task<JsonElement> GetAsync(string url, string token,
+        bool throwOnForbidden = true, CancellationToken ct = default)
     {
         const int maxAttempts = 5;
         int attempt = 0;
@@ -37,14 +40,22 @@ public class FigmaApiService
 
             var resp = await _http.GetAsync(url, ct);
 
-            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
-                resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 throw new FigmaAuthException("API Key 无效或已过期，请在设置中更新");
+
+            // 403: only treat as auth error on the /me endpoint (or when explicitly requested)
+            if (resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                if (throwOnForbidden)
+                    throw new FigmaAuthException("API Key 无效或已过期，请在设置中更新");
+                // For individual file endpoints: no access to this file, just fail naturally
+                resp.EnsureSuccessStatusCode(); // will throw HttpRequestException
+            }
 
             // Rate limited — wait then retry
             if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
             {
-                if (attempt >= maxAttempts) resp.EnsureSuccessStatusCode(); // throw after max
+                if (attempt >= maxAttempts) resp.EnsureSuccessStatusCode();
                 int wait = 60;
                 if (resp.Headers.TryGetValues("Retry-After", out var vals) &&
                     int.TryParse(vals.FirstOrDefault(), out var ra))
@@ -57,7 +68,7 @@ public class FigmaApiService
             if ((int)resp.StatusCode >= 500)
             {
                 if (attempt >= maxAttempts) resp.EnsureSuccessStatusCode();
-                var backoff = TimeSpan.FromSeconds(Math.Pow(2, attempt)); // 2, 4, 8, 16 s
+                var backoff = TimeSpan.FromSeconds(Math.Pow(2, attempt));
                 await Task.Delay(backoff, ct);
                 continue;
             }
@@ -70,7 +81,7 @@ public class FigmaApiService
 
     public async Task<bool> ValidateTokenAsync(string token)
     {
-        try { await GetAsync($"{BASE}/me", token); return true; }
+        try { await GetAsync($"{BASE}/me", token, throwOnForbidden: true); return true; }
         catch (FigmaAuthException) { return false; }
         catch { return false; }
     }
@@ -109,7 +120,7 @@ public class FigmaApiService
             var teamFileKeys = new HashSet<string>(); // tracks all file keys seen for this team
             int newFiles = 0, skippedFiles = 0;
 
-            var projectsDoc = await GetAsync($"{BASE}/teams/{team.TeamId}/projects", token, ct);
+            var projectsDoc = await GetAsync($"{BASE}/teams/{team.TeamId}/projects", token, throwOnForbidden: true, ct);
             var projects = projectsDoc.GetProperty("projects").EnumerateArray().ToList();
 
             for (int pi = 0; pi < projects.Count; pi++)
@@ -128,7 +139,7 @@ public class FigmaApiService
                     Detail   = projName
                 });
 
-                var filesDoc = await GetAsync($"{BASE}/projects/{projId}/files", token, ct);
+                var filesDoc = await GetAsync($"{BASE}/projects/{projId}/files", token, throwOnForbidden: true, ct);
                 var files = filesDoc.GetProperty("files").EnumerateArray().ToList();
 
                 for (int fi = 0; fi < files.Count; fi++)
@@ -178,7 +189,8 @@ public class FigmaApiService
                     var filePages = new List<FigmaPage>();
                     try
                     {
-                        var detail   = await GetAsync($"{BASE}/files/{fileKey}?depth=1", token, ct);
+                        // throwOnForbidden:false — some files may not be accessible; skip instead of aborting
+                        var detail   = await GetAsync($"{BASE}/files/{fileKey}?depth=1", token, throwOnForbidden: false, ct);
                         var children = detail.GetProperty("document").GetProperty("children").EnumerateArray();
                         foreach (var page in children)
                         {

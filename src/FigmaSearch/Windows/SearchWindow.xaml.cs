@@ -183,13 +183,15 @@ public partial class SearchWindow : Window
     {
         // Never hide if this window has not been explicitly shown yet
         if (!_hasBeenShown) return;
-        // Don't hide if another window owned by this app has focus or is visible
-        // (e.g. SettingsWindow or FirstRunWizard)
+
+        // Never hide if the Settings window is open (regardless of its active/visible state at this instant)
+        if (App.IsSettingsOpen) return;
+
+        // Don't hide if another app window is currently active or visible
         foreach (Window w in Application.Current.Windows)
         {
             if (w == this) continue;
-            if (w.IsActive || w.IsVisible)
-                return;
+            if (w.IsActive || w.IsVisible) return;
         }
         HideWindow();
     }
