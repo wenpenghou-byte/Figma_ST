@@ -82,9 +82,8 @@ public partial class SearchWindow : Window
         {
             TextValue  = item.DocumentName,
             Keyword    = _vm.Query,
-            Foreground = item.IsDocumentNameMatched
-                         ? (Brush)FindResource("FgPrimary")
-                         : (Brush)FindResource("FgSecondary"),
+            Foreground = (Brush)FindResource("FgPrimary"),
+            FontWeight = FontWeights.Normal,
             Margin     = new Thickness(16, 0, 8, 0),
             Padding    = new Thickness(0, 9, 0, 9),
             FontSize   = 14
@@ -180,13 +179,14 @@ public partial class SearchWindow : Window
 
     private void Window_Deactivated(object s, EventArgs e)
     {
-        // Don't hide if another window owned by this app just got focus
-        // (e.g. SettingsWindow or FirstRunWizard opening on top)
-        var active = Application.Current.Windows
-            .OfType<Window>()
-            .FirstOrDefault(w => w.IsActive);
-        if (active != null && active != this)
-            return;
+        // Don't hide if another window owned by this app has focus or is visible
+        // (e.g. SettingsWindow or FirstRunWizard)
+        foreach (Window w in Application.Current.Windows)
+        {
+            if (w == this) continue;
+            if (w.IsActive || w.IsVisible)
+                return;
+        }
         HideWindow();
     }
     private void Window_KeyDown(object s, KeyEventArgs e)

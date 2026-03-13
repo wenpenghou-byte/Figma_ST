@@ -1,7 +1,7 @@
 <Window x:Class="FigmaSearch.Windows.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FigmaSearch - 设置" Width="680" Height="600"
+        Title="肥姑妈搜 - 设置" Width="680" Height="600"
         WindowStyle="SingleBorderWindow" ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BgPrimary}"
@@ -20,13 +20,17 @@
                 <StackPanel Margin="0,0,0,16">
                     <TextBlock Text="Figma API Key" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
                     <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <PasswordBox x:Name="ApiKeyBox" Background="{StaticResource BgTertiary}"
                                      Foreground="{StaticResource FgPrimary}" BorderBrush="{StaticResource BorderColor}"
                                      Padding="10,8" FontSize="13" PasswordChanged="ApiKeyBox_Changed"/>
                         <Button Grid.Column="1" Content="验证" Margin="8,0,0,0"
                                 Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
                                 Foreground="{StaticResource FgPrimary}" Padding="12,8" Click="ValidateApiKey_Click"/>
+                        <Button Grid.Column="2" Content="?" Margin="4,0,0,0"
+                                Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
+                                Foreground="{StaticResource FgSecondary}" Padding="10,8"
+                                ToolTip="如何获取 API Key？" Click="ApiKeyHelp_Click"/>
                     </Grid>
                     <TextBlock x:Name="ApiKeyStatus" FontSize="11" Margin="0,4,0,0" Visibility="Collapsed"/>
                 </StackPanel>

@@ -1,6 +1,7 @@
 using FigmaSearch.Models;
 using FigmaSearch.Services;
 using FigmaSearch.ViewModels;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -35,6 +36,12 @@ public partial class SettingsWindow : Window
 
     private void ApiKeyBox_Changed(object s, RoutedEventArgs e) =>
         _vm.FigmaApiKey = ApiKeyBox.Password;
+
+    private void ApiKeyHelp_Click(object s, RoutedEventArgs e)
+    {
+        try { Process.Start(new ProcessStartInfo("https://docs.popo.netease.com/team/pc/5_63c60p/pageDetail/82a0a23187c74981ba8461b78ac9") { UseShellExecute = true }); }
+        catch { }
+    }
 
     private async void ValidateApiKey_Click(object s, RoutedEventArgs e)
     {

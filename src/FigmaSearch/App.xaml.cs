@@ -80,7 +80,7 @@ public partial class App : Application
     {
         var icon = new TaskbarIcon
         {
-            ToolTipText = "FigmaSearch",
+            ToolTipText = "肥姑妈搜",
         };
         try { icon.IconSource = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/Resources/tray.ico")); } catch { }
 
@@ -99,10 +99,18 @@ public partial class App : Application
         return icon;
     }
 
+    private static SettingsWindow? _settingsWindow;
+
     public static void OpenSettings()
     {
-        var win = new SettingsWindow();
-        win.ShowDialog();
+        if (_settingsWindow != null && _settingsWindow.IsLoaded)
+        {
+            _settingsWindow.Activate();
+            return;
+        }
+        _settingsWindow = new SettingsWindow();
+        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+        _settingsWindow.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)

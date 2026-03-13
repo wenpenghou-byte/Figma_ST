@@ -1,6 +1,7 @@
 using FigmaSearch.Models;
 using FigmaSearch.Services;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows;
 
 namespace FigmaSearch.Windows;
@@ -23,6 +24,12 @@ public partial class FirstRunWizard : Window
         _teams.Add(new TeamConfig { TeamId = id, DisplayName = name, SortOrder = _teams.Count });
         NewTeamId.Text = "";
         NewTeamName.Text = "";
+    }
+
+    private void ApiKeyHelp_Click(object s, RoutedEventArgs e)
+    {
+        try { Process.Start(new ProcessStartInfo("https://docs.popo.netease.com/team/pc/5_63c60p/pageDetail/82a0a23187c74981ba8461b78ac9") { UseShellExecute = true }); }
+        catch { }
     }
 
     private void Skip_Click(object s, RoutedEventArgs e)
