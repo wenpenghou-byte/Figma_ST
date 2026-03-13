@@ -1,7 +1,6 @@
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
-using System.Text.Json;
 
 namespace FigmaSearch.Services;
 
@@ -14,14 +13,19 @@ public class UpdateInfo
 
 public class UpdateService
 {
-    private const string RELEASES_URL = "https://api.github.com/repos/wenpenghou-byte/Figma_ST/releases/latest";
+    // Using redirect trick: GitHub /releases/latest redirects to /releases/tag/vX.Y.Z
+    // This bypasses the GitHub API entirely, so no auth token or rate-limit issues.
+    private const string LATEST_REDIRECT_URL = "https://github.com/wenpenghou-byte/Figma_ST/releases/latest";
+    private const string DOWNLOAD_URL = "https://github.com/wenpenghou-byte/Figma_ST/releases/latest/download/FigmaSearch_Setup.exe";
+
     private readonly HttpClient _http;
 
     public UpdateService()
     {
-        _http = new HttpClient();
+        // AllowAutoRedirect=false so we can read the Location header ourselves
+        _http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
         _http.DefaultRequestHeaders.Add("User-Agent", "FigmaSearch/1.0");
-        _http.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+        _http.Timeout = TimeSpan.FromSeconds(10);
     }
 
     public static string CurrentVersion()
@@ -34,19 +38,31 @@ public class UpdateService
     {
         try
         {
-            var resp = await _http.GetStringAsync(RELEASES_URL);
-            using var doc = JsonDocument.Parse(resp);
-            var root = doc.RootElement;
-            var tag = root.GetProperty("tag_name").GetString()?.TrimStart('v') ?? "";
-            var assets = root.GetProperty("assets").EnumerateArray().ToList();
-            var exeAsset = assets.FirstOrDefault(a =>
-                a.GetProperty("name").GetString()?.EndsWith(".exe") == true);
-            var dlUrl = exeAsset.ValueKind != JsonValueKind.Undefined
-                ? exeAsset.GetProperty("browser_download_url").GetString() ?? ""
-                : $"https://github.com/wenpenghou-byte/Figma_ST/releases/latest/download/FigmaSearch_Setup.exe";
+            using var resp = await _http.GetAsync(LATEST_REDIRECT_URL);
+
+            // Expect a 302 redirect whose Location is .../releases/tag/vX.Y.Z
+            var location = resp.Headers.Location?.ToString() ?? "";
+            if (string.IsNullOrEmpty(location))
+            {
+                System.Diagnostics.Debug.WriteLine("[UpdateService] No Location header in response.");
+                return null;
+            }
+
+            // Extract version from the tag segment, e.g. ".../tag/v1.3.5" -> "1.3.5"
+            var tag = location.Split('/').LastOrDefault()?.TrimStart('v') ?? "";
+            if (string.IsNullOrEmpty(tag))
+            {
+                System.Diagnostics.Debug.WriteLine($"[UpdateService] Could not parse tag from: {location}");
+                return null;
+            }
 
             var isNewer = CompareVersions(tag, CurrentVersion()) > 0;
-            return new UpdateInfo { LatestVersion = tag, DownloadUrl = dlUrl, IsNewer = isNewer };
+            return new UpdateInfo
+            {
+                LatestVersion = tag,
+                DownloadUrl   = DOWNLOAD_URL,
+                IsNewer       = isNewer
+            };
         }
         catch (Exception ex)
         {
@@ -59,8 +75,8 @@ public class UpdateService
     {
         try
         {
-            var va = Version.Parse(a.Contains(".") ? a : a + ".0");
-            var vb = Version.Parse(b.Contains(".") ? b : b + ".0");
+            var va = Version.Parse(a.Contains('.') ? a : a + ".0");
+            var vb = Version.Parse(b.Contains('.') ? b : b + ".0");
             return va.CompareTo(vb);
         }
         catch { return string.Compare(a, b, StringComparison.Ordinal); }
@@ -69,8 +85,12 @@ public class UpdateService
     public async Task<string> DownloadInstallerAsync(string downloadUrl,
         IProgress<int> progress, CancellationToken ct = default)
     {
+        // For download we need redirects, so use a separate client
+        using var dlClient = new HttpClient();
+        dlClient.DefaultRequestHeaders.Add("User-Agent", "FigmaSearch/1.0");
+
         var tempPath = Path.Combine(Path.GetTempPath(), "FigmaSearch_Update.exe");
-        using var resp = await _http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var resp = await dlClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
         resp.EnsureSuccessStatusCode();
         var total = resp.Content.Headers.ContentLength ?? -1;
         using var stream = await resp.Content.ReadAsStreamAsync(ct);
