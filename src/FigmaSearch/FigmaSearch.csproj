@@ -27,6 +27,7 @@
     <Resource Include="Resources/tray.ico" />
     <Resource Include="Resources/app.ico" />
     <Resource Include="Resources/Themes/DarkTheme.xaml" />
+    <Resource Include="Resources/Themes/LightTheme.xaml" />
   </ItemGroup>
 
 </Project>
