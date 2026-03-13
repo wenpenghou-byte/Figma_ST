@@ -269,4 +269,13 @@ public partial class SettingsWindow : Window
     }
 
     private void Cancel_Click(object s, RoutedEventArgs e) => Close();
+
+    // ── Contact ──────────────────────────────────────────────────
+
+    private void ContactLink_RequestNavigate(object s, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        try { Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true }); }
+        catch { }
+        e.Handled = true;
+    }
 }
