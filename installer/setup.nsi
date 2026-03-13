@@ -13,7 +13,7 @@
 !define RUN_KEY          "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile ".\dist\FigmaSearch_Setup_${PRODUCT_VERSION}.exe"
+OutFile ".\dist\FigmaSearch_Setup.exe"
 InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
 InstallDirRegKey HKLM "Software\${PRODUCT_NAME}" "InstallDir"
 RequestExecutionLevel admin
