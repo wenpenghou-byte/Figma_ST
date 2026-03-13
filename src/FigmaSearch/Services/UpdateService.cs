@@ -39,15 +39,20 @@ public class UpdateService
             var root = doc.RootElement;
             var tag = root.GetProperty("tag_name").GetString()?.TrimStart('v') ?? "";
             var assets = root.GetProperty("assets").EnumerateArray().ToList();
-            var dlUrl = assets.Count > 0
-                ? assets.FirstOrDefault(a => a.GetProperty("name").GetString()?.EndsWith(".exe") == true)
-                        .GetProperty("browser_download_url").GetString() ?? ""
-                : "";
+            var exeAsset = assets.FirstOrDefault(a =>
+                a.GetProperty("name").GetString()?.EndsWith(".exe") == true);
+            var dlUrl = exeAsset.ValueKind != JsonValueKind.Undefined
+                ? exeAsset.GetProperty("browser_download_url").GetString() ?? ""
+                : $"https://github.com/wenpenghou-byte/Figma_ST/releases/latest/download/FigmaSearch_Setup.exe";
 
             var isNewer = CompareVersions(tag, CurrentVersion()) > 0;
             return new UpdateInfo { LatestVersion = tag, DownloadUrl = dlUrl, IsNewer = isNewer };
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[UpdateService] CheckForUpdateAsync failed: {ex.Message}");
+            return null;
+        }
     }
 
     private static int CompareVersions(string a, string b)
