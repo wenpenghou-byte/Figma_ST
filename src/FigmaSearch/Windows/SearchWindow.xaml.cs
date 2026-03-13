@@ -287,11 +287,6 @@ public partial class SearchWindow : Window
     {
         if (!_hasBeenShown) return;
         if (App.IsSettingsOpen) return;
-        foreach (Window w in Application.Current.Windows)
-        {
-            if (w == this) continue;
-            if (w.IsActive || w.IsVisible) return;
-        }
         HideWindow();
     }
     private void Window_KeyDown(object s, KeyEventArgs e)

@@ -192,6 +192,7 @@ public class FigmaApiService
                     };
 
                     var filePages = new List<FigmaPage>();
+                    bool pagesFetchOk = false;
                     try
                     {
                         // throwOnForbidden:false — some files may not be accessible; skip instead of aborting
@@ -210,12 +211,21 @@ public class FigmaApiService
                                 Url         = $"{fileUrl}?node-id={nodeId}"
                             });
                         }
+                        pagesFetchOk = true;
                     }
-                    catch (Exception ex) when (ex is not FigmaAuthException && ex is not OperationCanceledException) { /* skip pages on error */ }
+                    catch (Exception ex) when (ex is not FigmaAuthException && ex is not OperationCanceledException)
+                    {
+                        // Could not fetch pages (e.g. 403 view-only, network error).
+                        // Do NOT persist empty pages — keep whatever is already in the DB.
+                        System.Diagnostics.Debug.WriteLine($"[FigmaApi] Skipping pages for {fileName} ({fileKey}): {ex.Message}");
+                    }
 
-                    // ── Persist immediately after each file ──
-                    onFileSynced?.Invoke(doc, filePages);
-                    alreadySyncedKeys[fileKey] = lastModified; // update in-memory cache for resume
+                    // ── Persist immediately after each file, but only if pages were fetched successfully ──
+                    if (pagesFetchOk)
+                    {
+                        onFileSynced?.Invoke(doc, filePages);
+                        alreadySyncedKeys[fileKey] = lastModified; // update in-memory cache for resume
+                    }
                     newFiles++;
 
                     await Task.Delay(200, ct); // respect rate limits
