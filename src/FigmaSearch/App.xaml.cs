@@ -43,6 +43,8 @@ public partial class App : Application
             var wizard = new FirstRunWizard();
             wizard.ShowDialog();
             settings = DB.LoadSettings();
+            // Exit if user closed wizard without completing setup
+            // (no API key OR no teams means nothing was configured at all)
             if (string.IsNullOrEmpty(settings.FigmaApiKey) || DB.GetTeams().Count == 0)
             {
                 // Setup incomplete — release mutex so user can relaunch
@@ -51,6 +53,13 @@ public partial class App : Application
                 _instanceMutex = null;
                 Shutdown();
                 return;
+            }
+            // If IsFirstRun is still true here, sync was interrupted but key+teams are saved.
+            // Fall through and start normally — user can trigger sync from Settings.
+            if (settings.IsFirstRun)
+            {
+                settings.IsFirstRun = false;
+                DB.SaveSettings(settings);
             }
         }
 

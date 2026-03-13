@@ -65,11 +65,11 @@ public partial class FirstRunWizard : Window
             return;
         }
 
-        // Save settings
+        // Save API key and teams first (but keep IsFirstRun=true until sync succeeds)
         var settings = App.DB.LoadSettings();
-        settings.FigmaApiKey = key;
-        settings.IsFirstRun  = false;
+        settings.FigmaApiKey     = key;
         settings.LaunchAtStartup = StartupCheck.IsChecked == true;
+        // Note: IsFirstRun stays true until sync completes successfully
         App.DB.SaveSettings(settings);
         App.DB.SaveTeams(_teams);
         StartupManager.Set(settings.LaunchAtStartup);
@@ -112,6 +112,10 @@ public partial class FirstRunWizard : Window
 
             SyncStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
             SyncStatus.Text = $"同步完成，共 {totalFiles} 个文件！";
+            // Mark setup as fully complete only after sync succeeds
+            var s2 = App.DB.LoadSettings();
+            s2.IsFirstRun = false;
+            App.DB.SaveSettings(s2);
             await System.Threading.Tasks.Task.Delay(1200);
             Close();
         }

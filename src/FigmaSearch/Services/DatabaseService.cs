@@ -145,7 +145,8 @@ public class DatabaseService : IDisposable
         c.Execute("DELETE FROM SearchIndex WHERE entity_type='page' AND document_key=@key", new { key = doc.Key }, tx);
         foreach (var p in pages)
         {
-            c.Execute("INSERT INTO Pages(id,document_key,name,url) VALUES(@Id,@DocumentKey,@Name,@Url)", p, tx);
+            // INSERT OR REPLACE handles the case where the same page id appears in multiple files
+            c.Execute("INSERT OR REPLACE INTO Pages(id,document_key,name,url) VALUES(@Id,@DocumentKey,@Name,@Url)", p, tx);
             c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('page',@id,@name,@teamId,@docKey)",
                 new { id = p.Id, name = p.Name, teamId = doc.TeamId, docKey = doc.Key }, tx);
         }
