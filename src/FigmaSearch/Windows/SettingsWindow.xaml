@@ -72,15 +72,30 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-                <!-- Interval -->
+                <!-- Interval + Manual sync -->
                 <StackPanel Margin="0,0,0,16">
-                    <TextBlock Text="自动更新间隔（小时）" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
-                    <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="文档数据同步" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+                    <!-- Auto interval -->
+                    <TextBlock Text="自动同步间隔" Foreground="{StaticResource FgPrimary}" FontSize="12" Margin="0,0,0,4"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                         <Slider x:Name="IntervalSlider" Minimum="6" Maximum="168" Value="48" Width="280"
                                 VerticalAlignment="Center" ValueChanged="IntervalSlider_Changed"/>
                         <TextBlock x:Name="IntervalLabel" Text="48 小时" Margin="12,0,0,0"
                                    Foreground="{StaticResource FgPrimary}" VerticalAlignment="Center"/>
                     </StackPanel>
+                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,0,0,2"
+                               Text="程序在后台按此间隔自动拉取 Figma 最新文档数据。"/>
+                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,0,0,12"
+                               Text="⚠ 仅拥有 view 权限的 Team 建议关闭自动同步（设为最大值），改用下方手动同步。"/>
+                    <!-- Manual sync -->
+                    <TextBlock Text="手动同步" Foreground="{StaticResource FgPrimary}" FontSize="12" Margin="0,0,0,4"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="立即同步文档" Style="{StaticResource FlatButton}"
+                                Background="{StaticResource BgHover}" Padding="14,8" Click="ManualSync_Click"/>
+                        <TextBlock x:Name="SyncStatus" Margin="12,0,0,0"
+                                   Foreground="{StaticResource FgSecondary}" VerticalAlignment="Center" FontSize="12"/>
+                    </StackPanel>
+                    <TextBlock x:Name="DbStats" Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,8,0,0"/>
                 </StackPanel>
                 <!-- Startup -->
                 <CheckBox x:Name="StartupCheck" Content="开机启动"
@@ -108,17 +123,6 @@
                     </StackPanel>
                     <TextBlock x:Name="HotkeyHint" Text="点击输入框后按下快捷键组合（需含 Ctrl/Alt/Shift 修饰键）"
                                Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,4,0,0"/>
-                </StackPanel>
-                <!-- Manual sync -->
-                <StackPanel Margin="0,0,0,16">
-                    <TextBlock Text="文档信息" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
-                    <StackPanel Orientation="Horizontal">
-                        <Button Content="立即同步文档" Style="{StaticResource FlatButton}"
-                                Background="{StaticResource BgHover}" Padding="14,8" Click="ManualSync_Click"/>
-                        <TextBlock x:Name="SyncStatus" Margin="12,0,0,0"
-                                   Foreground="{StaticResource FgSecondary}" VerticalAlignment="Center" FontSize="12"/>
-                    </StackPanel>
-                    <TextBlock x:Name="DbStats" Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,8,0,0"/>
                 </StackPanel>
                 <!-- Check for updates -->
                 <StackPanel Margin="0,0,0,16">
