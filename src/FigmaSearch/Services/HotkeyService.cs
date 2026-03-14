@@ -145,10 +145,11 @@ public class HotkeyService : IDisposable
                     if (_fireOnNextAltUp)
                     {
                         _fireOnNextAltUp = false;
-                        // Fire the hotkey now that Alt is released — no stuck Alt state.
-                        // Swallow this Alt-up to prevent Start menu activation.
+                        // Let the Alt-up pass through normally (no swallowing!),
+                        // then fire the hotkey after a short delay so Windows
+                        // finishes processing the Alt release first.
                         _dispatcher.BeginInvoke(() => HotkeyPressed?.Invoke(this, EventArgs.Empty));
-                        return (IntPtr)1;
+                        // Do NOT return 1 — let the key event pass through
                     }
                     else
                     {

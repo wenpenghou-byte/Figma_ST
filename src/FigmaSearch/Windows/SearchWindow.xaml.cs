@@ -18,6 +18,7 @@ public partial class SearchWindow : Window
     private UpdateInfo? _pendingUpdate;
     private bool _hasBeenShown;
     private string? _syncErrorMessage;
+    private bool _suppressDeactivate; // brief guard during ShowWindow activation
 
     public SearchWindow()
     {
@@ -132,15 +133,29 @@ public partial class SearchWindow : Window
     private void ShowWindow()
     {
         _hasBeenShown = true;
+        _suppressDeactivate = true; // guard until we've activated
+
         var screen = System.Windows.SystemParameters.WorkArea;
         Left = screen.Left + (screen.Width - Width) / 2;
         Top  = screen.Top  + screen.Height * 0.22;
         base.Show();
 
-        // Force Windows-level activation so keyboard input goes to this window,
-        // not the desktop. Required for overlay windows (WindowStyle=None,
-        // ShowInTaskbar=False) activated from a global hotkey hook.
-        ForceActivateAndFocus();
+        // Delay activation slightly so Windows finishes processing the Alt key-up
+        // from DoubleAlt before we steal focus. Without this delay, the Alt-up
+        // event can activate the Start menu and immediately deactivate our window.
+        var timer = new DispatcherTimer(DispatcherPriority.Normal)
+        {
+            Interval = TimeSpan.FromMilliseconds(50)
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (!IsVisible) return;
+            ForceActivateAndFocus();
+            // Allow Deactivated to hide the window again after activation completes
+            Dispatcher.InvokeAsync(() => { _suppressDeactivate = false; }, DispatcherPriority.Input);
+        };
+        timer.Start();
 
         // Restore persistent error if any
         if (_syncErrorMessage != null)
@@ -378,6 +393,7 @@ public partial class SearchWindow : Window
     {
         if (!_hasBeenShown) return;
         if (App.IsSettingsOpen) return;
+        if (_suppressDeactivate) return; // ShowWindow activation in progress
         HideWindow();
     }
     private void Window_KeyDown(object s, KeyEventArgs e)
