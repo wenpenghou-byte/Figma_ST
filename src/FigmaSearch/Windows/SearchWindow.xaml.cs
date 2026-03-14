@@ -14,14 +14,20 @@ namespace FigmaSearch.Windows;
 
 public partial class SearchWindow : Window
 {
-    private readonly SearchViewModel _vm;
-    private UpdateInfo? _pendingUpdate;
-    private bool _hasBeenShown;
-    private string? _syncErrorMessage;
-    private bool _suppressDeactivate; // brief guard during ShowWindow activation
-    /// <summary>Whether the AI response area is currently shown (replaces search results).</summary>
-    private bool _isAiMode;
-    private CancellationTokenSource? _aiCts;
+     private readonly SearchViewModel _vm;
+     private UpdateInfo? _pendingUpdate;
+     private bool _hasBeenShown;
+     private string? _syncErrorMessage;
+
+     /// <summary>
+     /// Incremented on every ShowWindow call. Callbacks from previous cycles
+     /// check this and no-op if stale, preventing cross-cycle state corruption.
+     /// </summary>
+     private int _showGeneration;
+     private bool _suppressDeactivate; // brief guard during ShowWindow activation
+     /// <summary>Whether the AI response area is currently shown (replaces search results).</summary>
+     private bool _isAiMode;
+     private CancellationTokenSource? _aiCts;
 
     public SearchWindow()
     {
@@ -136,33 +142,22 @@ public partial class SearchWindow : Window
     private void ShowWindow()
     {
         _hasBeenShown = true;
-        _suppressDeactivate = true; // guard until we've activated
+        _suppressDeactivate = true;
+        var gen = ++_showGeneration; // invalidate any pending callbacks from previous cycles
 
         var screen = System.Windows.SystemParameters.WorkArea;
         Left = screen.Left + (screen.Width - Width) / 2;
         Top  = screen.Top  + screen.Height * 0.22;
         base.Show();
 
-        // Delay activation slightly so Windows finishes processing the Alt key-up
-        // from DoubleAlt before we steal focus.
-        var timer = new DispatcherTimer(DispatcherPriority.Normal)
+        // Use ApplicationIdle priority so activation runs after Windows finishes
+        // processing the Alt key-up from DoubleAlt. Single-shot, generation-guarded.
+        Dispatcher.BeginInvoke((Action)(() =>
         {
-            Interval = TimeSpan.FromMilliseconds(80)
-        };
-        timer.Tick += (_, _) =>
-        {
-            timer.Stop();
+            if (gen != _showGeneration) return; // stale callback from previous cycle
             if (!IsVisible) return;
-            ForceActivateAndFocus();
-            // Second attempt after another short delay as a safety net
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (!IsVisible) return;
-                if (!IsActive) ForceActivateAndFocus();
-                _suppressDeactivate = false;
-            }, DispatcherPriority.Input);
-        };
-        timer.Start();
+            ForceActivateAndFocus(gen);
+        }), DispatcherPriority.ApplicationIdle);
 
         // Restore persistent error if any
         if (_syncErrorMessage != null)
@@ -175,45 +170,31 @@ public partial class SearchWindow : Window
     /// <summary>
     /// Uses Win32 AttachThreadInput + SetForegroundWindow to reliably steal focus
     /// from whatever window currently owns it, then sets WPF keyboard focus to
-    /// the search TextBox via a deferred Dispatcher callback.
+    /// the search TextBox. Generation-guarded: no-ops if a newer ShowWindow cycle started.
     /// </summary>
-    private void ForceActivateAndFocus()
+    private void ForceActivateAndFocus(int gen)
     {
+        if (gen != _showGeneration || !IsVisible) return;
+
         var hwnd = new WindowInteropHelper(this).EnsureHandle();
 
-        // Attach our thread to the foreground window's thread so Windows allows
-        // us to call SetForegroundWindow (otherwise it silently fails).
         var foregroundHwnd = GetForegroundWindow();
         var foregroundThread = GetWindowThreadProcessId(foregroundHwnd, IntPtr.Zero);
         var ourThread = GetWindowThreadProcessId(hwnd, IntPtr.Zero);
 
         bool attached = false;
         if (foregroundThread != ourThread)
-        {
             attached = AttachThreadInput(foregroundThread, ourThread, true);
-        }
 
-        try
-        {
-            SetForegroundWindow(hwnd);
-        }
-        finally
-        {
-            if (attached)
-                AttachThreadInput(foregroundThread, ourThread, false);
-        }
+        try { SetForegroundWindow(hwnd); }
+        finally { if (attached) AttachThreadInput(foregroundThread, ourThread, false); }
 
         Activate();
+        SearchBox.Focus();
+        Keyboard.Focus(SearchBox);
 
-        // Defer keyboard focus until after WPF finishes layout/render.
-        // Guard: only focus if window is still visible (user may have dismissed it
-        // between Show() and this callback via Deactivated or Escape).
-        Dispatcher.InvokeAsync(() =>
-        {
-            if (!IsVisible) return;
-            SearchBox.Focus();
-            Keyboard.Focus(SearchBox);
-        }, DispatcherPriority.Input);
+        // Now that we're activated, allow Deactivated to function normally.
+        _suppressDeactivate = false;
     }
 
     private void HideWindow()

@@ -24,19 +24,23 @@ public partial class SettingsWindow : Window
         IntervalSlider.Value = _vm.UpdateIntervalHours;
         IntervalLabel.Text = $"{_vm.UpdateIntervalHours} 小时";
         StartupCheck.IsChecked = _vm.LaunchAtStartup;
-        HotkeyBox.Text = FormatConfigForDisplay(_vm.HotkeyConfig);
-        // Set theme combo selection without triggering the change handler
-        ThemeCombo.SelectionChanged -= ThemeCombo_Changed;
-        ThemeCombo.SelectedIndex = _vm.Theme == "Light" ? 1 : 0;
-        ThemeCombo.SelectionChanged += ThemeCombo_Changed;
-        VersionLabel.Text = $"当前版本：{UpdateService.CurrentVersion()}";
-        UpdateDbStats();
+         HotkeyBox.Text = FormatConfigForDisplay(_vm.HotkeyConfig);
+         // Set theme combo selection without triggering the change handler
+         ThemeCombo.SelectionChanged -= ThemeCombo_Changed;
+         ThemeCombo.SelectedIndex = _vm.Theme == "Light" ? 1 : 0;
+         ThemeCombo.SelectionChanged += ThemeCombo_Changed;
+         VersionLabel.Text = $"当前版本：{UpdateService.CurrentVersion()}";
+         UpdateDbStats();
 
-        // BrainMaker AI fields
-        BmAuthAccountBox.Text = _vm.BmAuthAccount;
-        BmAuthKeyBox.Password = _vm.BmAuthKey;
-        BmUserCorpBox.Text = _vm.BmUserCorp;
-    }
+         // BrainMaker AI fields
+         BmAuthAccountBox.Text = _vm.BmAuthAccount;
+         BmAuthKeyBox.Password = _vm.BmAuthKey;
+         BmUserCorpBox.Text = _vm.BmUserCorp;
+
+         // If there's already a pending update, show install button immediately
+         if (App.PendingUpdate != null)
+             ShowInstallButton($"发现新版本 v{App.PendingUpdate.LatestVersion}");
+     }
 
     private void UpdateDbStats()
     {
@@ -235,9 +239,9 @@ public partial class SettingsWindow : Window
             }
             else if (info.IsNewer)
             {
-                UpdateStatus.Text = $"发现新版本 v{info.LatestVersion}，点击搜索框右上角更新按钮安装";
-                UpdateStatus.Foreground = (Brush)FindResource("SuccessGreen");
+                App.PendingUpdate = info;
                 App.SearchWin.ShowUpdateBadge(info);
+                ShowInstallButton($"发现新版本 v{info.LatestVersion}");
             }
             else
             {
@@ -253,6 +257,42 @@ public partial class SettingsWindow : Window
         finally
         {
             CheckUpdateBtn.IsEnabled = true;
+        }
+    }
+
+    private void ShowInstallButton(string statusText)
+    {
+        CheckUpdateBtn.Visibility = Visibility.Collapsed;
+        InstallUpdateBtn.Visibility = Visibility.Visible;
+        UpdateStatus.Text = statusText;
+        UpdateStatus.Foreground = (Brush)FindResource("SuccessGreen");
+    }
+
+    private async void InstallUpdate_Click(object s, RoutedEventArgs e)
+    {
+        if (App.PendingUpdate == null) return;
+        InstallUpdateBtn.IsEnabled = false;
+        UpdateStatus.Text = "正在下载安装包…";
+        UpdateStatus.Foreground = (Brush)FindResource("FgSecondary");
+        try
+        {
+            var prog = new Progress<int>(percent =>
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    UpdateStatus.Text = percent < 100 ? $"下载中 {percent}%…" : "下载完成，正在启动安装…";
+                });
+            });
+            var path = await App.Updater.DownloadInstallerAsync(App.PendingUpdate.DownloadUrl, prog);
+            UpdateStatus.Text = "正在启动安装…";
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            Application.Current.Shutdown();
+        }
+        catch
+        {
+            InstallUpdateBtn.IsEnabled = true;
+            UpdateStatus.Text = "下载失败，请重试";
+            UpdateStatus.Foreground = (Brush)FindResource("ErrorRed");
         }
     }
 
