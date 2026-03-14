@@ -141,19 +141,23 @@ public partial class SearchWindow : Window
         base.Show();
 
         // Delay activation slightly so Windows finishes processing the Alt key-up
-        // from DoubleAlt before we steal focus. Without this delay, the Alt-up
-        // event can activate the Start menu and immediately deactivate our window.
+        // from DoubleAlt before we steal focus.
         var timer = new DispatcherTimer(DispatcherPriority.Normal)
         {
-            Interval = TimeSpan.FromMilliseconds(50)
+            Interval = TimeSpan.FromMilliseconds(80)
         };
         timer.Tick += (_, _) =>
         {
             timer.Stop();
             if (!IsVisible) return;
             ForceActivateAndFocus();
-            // Allow Deactivated to hide the window again after activation completes
-            Dispatcher.InvokeAsync(() => { _suppressDeactivate = false; }, DispatcherPriority.Input);
+            // Second attempt after another short delay as a safety net
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (!IsVisible) return;
+                if (!IsActive) ForceActivateAndFocus();
+                _suppressDeactivate = false;
+            }, DispatcherPriority.Input);
         };
         timer.Start();
 
@@ -211,6 +215,7 @@ public partial class SearchWindow : Window
 
     private void HideWindow()
     {
+        _suppressDeactivate = false;
         Hide();
         SearchBox.Text = "";
         _vm.ClearSearch();
