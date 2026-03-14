@@ -90,8 +90,10 @@ public class FigmaApiService
     /// Full sync: fetches all teams' files and ALL pages for every file.
     /// Every file's pages are always re-fetched to guarantee completeness.
     /// If a file's page fetch fails (403, network, etc.), existing DB pages are preserved.
-    /// After a team fully completes, calls <paramref name="onTeamFinished"/> so callers can
-    /// clean up deleted files.
+    /// Cancellation is only checked between files (never mid-file), so every started
+    /// file is guaranteed to be fully persisted.
+    /// Files are synced in last_modified descending order so recently-changed
+    /// documents are processed first.
     /// </summary>
     public async Task SyncAllTeamsAsync(
         List<TeamConfig> teams,
@@ -103,7 +105,8 @@ public class FigmaApiService
     {
         for (int ti = 0; ti < teams.Count; ti++)
         {
-            ct.ThrowIfCancellationRequested();
+            // Check cancel only between teams — never mid-file
+            if (ct.IsCancellationRequested) return;
             var team = teams[ti];
 
             progress.Report(new SyncProgress
@@ -117,13 +120,21 @@ public class FigmaApiService
 
             var teamFileKeys = new HashSet<string>(); // tracks all file keys seen for this team
             int syncedFiles = 0, failedFiles = 0;
+            bool teamFullyCompleted = true; // tracks whether ALL files in this team were processed
 
-            var projectsDoc = await GetAsync($"{BASE}/teams/{team.TeamId}/projects", token, throwOnForbidden: true, ct);
+            JsonElement projectsDoc;
+            try
+            {
+                projectsDoc = await GetAsync($"{BASE}/teams/{team.TeamId}/projects", token, throwOnForbidden: true, ct);
+            }
+            catch (OperationCanceledException) { return; }
+
             var projects = projectsDoc.GetProperty("projects").EnumerateArray().ToList();
 
             for (int pi = 0; pi < projects.Count; pi++)
             {
-                ct.ThrowIfCancellationRequested();
+                if (ct.IsCancellationRequested) { teamFullyCompleted = false; break; }
+
                 var proj     = projects[pi];
                 var projId   = proj.GetProperty("id").GetRawText().Trim('"');
                 var projName = proj.GetProperty("name").GetString() ?? "";
@@ -137,12 +148,28 @@ public class FigmaApiService
                     Detail   = projName
                 });
 
-                var filesDoc = await GetAsync($"{BASE}/projects/{projId}/files", token, throwOnForbidden: true, ct);
+                JsonElement filesDoc;
+                try
+                {
+                    filesDoc = await GetAsync($"{BASE}/projects/{projId}/files", token, throwOnForbidden: true, ct);
+                }
+                catch (OperationCanceledException) { teamFullyCompleted = false; break; }
+
                 var files = filesDoc.GetProperty("files").EnumerateArray().ToList();
+
+                // Sort files by last_modified descending — recently changed files first
+                files.Sort((a, b) =>
+                {
+                    var aLm = a.TryGetProperty("last_modified", out var av) ? (av.GetString() ?? "") : "";
+                    var bLm = b.TryGetProperty("last_modified", out var bv) ? (bv.GetString() ?? "") : "";
+                    return string.Compare(bLm, aLm, StringComparison.Ordinal); // descending
+                });
 
                 for (int fi = 0; fi < files.Count; fi++)
                 {
-                    ct.ThrowIfCancellationRequested();
+                    // Check cancel BEFORE starting a file — once started, always finish
+                    if (ct.IsCancellationRequested) { teamFullyCompleted = false; break; }
+
                     var file     = files[fi];
                     var fileKey      = file.GetProperty("key").GetString() ?? "";
                     var fileName     = file.GetProperty("name").GetString() ?? "";
@@ -177,7 +204,8 @@ public class FigmaApiService
                     try
                     {
                         // throwOnForbidden:false — some files may not be accessible; skip instead of aborting
-                        var detail   = await GetAsync($"{BASE}/files/{fileKey}?depth=1", token, throwOnForbidden: false, ct);
+                        // Do NOT pass ct here — once we started a file, let it finish
+                        var detail   = await GetAsync($"{BASE}/files/{fileKey}?depth=1", token, throwOnForbidden: false);
                         var children = detail.GetProperty("document").GetProperty("children").EnumerateArray();
                         foreach (var page in children)
                         {
@@ -194,7 +222,7 @@ public class FigmaApiService
                         }
                         pagesFetchOk = true;
                     }
-                    catch (Exception ex) when (ex is not FigmaAuthException && ex is not OperationCanceledException)
+                    catch (Exception ex) when (ex is not FigmaAuthException)
                     {
                         // Could not fetch pages (e.g. 403 view-only, network error).
                         failedFiles++;
@@ -207,24 +235,33 @@ public class FigmaApiService
                     onFileSynced?.Invoke(doc, pagesFetchOk ? filePages : null);
                     syncedFiles++;
 
-                    await Task.Delay(200, ct); // respect rate limits
+                    // Rate limit delay — do NOT pass ct (let the write complete cleanly)
+                    try { await Task.Delay(200, ct); }
+                    catch (OperationCanceledException) { /* delay interrupted, that's fine — file is already saved */ }
                 }
             }
 
-            // Notify caller so it can clean up files deleted from Figma
-            onTeamFinished?.Invoke(team.TeamId, teamFileKeys);
+            // Only clean up deleted files if we successfully enumerated ALL files in this team.
+            // If sync was cancelled mid-team, we might not have seen all files yet —
+            // cleaning up would incorrectly delete files we simply haven't reached.
+            if (teamFullyCompleted)
+            {
+                onTeamFinished?.Invoke(team.TeamId, teamFileKeys);
+            }
 
             var detail2 = failedFiles > 0
                 ? $"同步 {syncedFiles} 个文件，{failedFiles} 个文件获取失败（已保留旧数据）"
                 : $"同步 {syncedFiles} 个文件";
             progress.Report(new SyncProgress
             {
-                Phase    = $"已完成 {team.DisplayName}",
+                Phase    = teamFullyCompleted ? $"已完成 {team.DisplayName}" : $"已中断 {team.DisplayName}",
                 TeamName = team.DisplayName,
                 Current  = ti + 1,
                 Total    = teams.Count,
                 Detail   = detail2
             });
+
+            if (!teamFullyCompleted) return; // cancelled — stop processing more teams
         }
 
         progress.Report(new SyncProgress
