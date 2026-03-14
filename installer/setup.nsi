@@ -67,7 +67,7 @@ Section /o "Start Menu Shortcut" SEC_STARTMENU
     CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_SHORTCUT}.lnk" "$INSTDIR\FigmaSearch.exe"
 SectionEnd
 
-Section /o "Run at Startup" SEC_STARTUP
+Section "Run at Startup" SEC_STARTUP
     WriteRegStr HKCU "${RUN_KEY}" "${PRODUCT_NAME}" '"$INSTDIR\FigmaSearch.exe"'
 SectionEnd
 
