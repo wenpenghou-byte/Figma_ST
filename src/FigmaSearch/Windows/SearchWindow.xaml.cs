@@ -222,6 +222,7 @@ public partial class SearchWindow : Window
     {
         ResultsPanel.Children.Clear();
         ResultsArea.Visibility = _vm.Results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ResultsScroll.ScrollToTop();
         foreach (var group in _vm.Results)
         {
             var lbl = new TextBlock
@@ -306,11 +307,31 @@ public partial class SearchWindow : Window
         return outer;
     }
 
+    /// <summary>
+    /// Opens a Figma URL, preferring the desktop client (figma:// protocol).
+    /// Falls back to the default browser if the desktop app is not installed
+    /// or the protocol launch fails.
+    /// </summary>
     private static void OpenUrl(string url)
     {
         if (string.IsNullOrEmpty(url)) return;
-        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
-        catch { }
+
+        // Convert https://www.figma.com/... → figma://...
+        var figmaUri = url
+            .Replace("https://www.figma.com/", "figma://")
+            .Replace("http://www.figma.com/", "figma://");
+
+        try
+        {
+            // Try desktop client first via figma:// protocol
+            Process.Start(new ProcessStartInfo(figmaUri) { UseShellExecute = true });
+        }
+        catch
+        {
+            // figma:// not registered or launch failed — fall back to browser
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+            catch { }
+        }
     }
 
     public void ShowUpdateBadge(UpdateInfo info)
