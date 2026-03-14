@@ -31,6 +31,11 @@ public partial class SettingsWindow : Window
         ThemeCombo.SelectionChanged += ThemeCombo_Changed;
         VersionLabel.Text = $"当前版本：{UpdateService.CurrentVersion()}";
         UpdateDbStats();
+
+        // BrainMaker AI fields
+        BmAuthAccountBox.Text = _vm.BmAuthAccount;
+        BmAuthKeyBox.Password = _vm.BmAuthKey;
+        BmUserCorpBox.Text = _vm.BmUserCorp;
     }
 
     private void UpdateDbStats()
@@ -282,10 +287,18 @@ public partial class SettingsWindow : Window
         var oldTeamIds = App.DB.GetTeams().Select(t => t.TeamId).ToHashSet();
         var newTeamIds = _vm.Teams.Select(t => t.TeamId).ToHashSet();
 
+        // Capture BrainMaker fields before save
+        _vm.BmAuthAccount = BmAuthAccountBox.Text.Trim();
+        _vm.BmAuthKey = BmAuthKeyBox.Password;
+        _vm.BmUserCorp = BmUserCorpBox.Text.Trim();
+
         _vm.Save();
 
         // Apply new hotkey immediately
         App.Hotkey?.ApplyConfig(_vm.HotkeyConfig);
+
+        // Reconfigure BrainMaker service with new credentials
+        App.BrainMaker?.Configure(_vm.BmAuthAccount, _vm.BmAuthKey, _vm.BmUserCorp, _vm.BmProject);
 
         // Only trigger sync when teams were ADDED (new data to fetch).
         // Removing teams just deletes local data (handled by SaveTeams) — no sync needed.

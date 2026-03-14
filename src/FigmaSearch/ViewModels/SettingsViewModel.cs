@@ -43,6 +43,28 @@ public class SettingsViewModel : INotifyPropertyChanged
         set { _settings.Theme = value; OnPropertyChanged(); }
     }
 
+    // ── BrainMaker AI ────────────────────────────────────────
+    public string BmAuthAccount
+    {
+        get => _settings.BmAuthAccount;
+        set { _settings.BmAuthAccount = value; OnPropertyChanged(); }
+    }
+    public string BmAuthKey
+    {
+        get => _settings.BmAuthKey;
+        set { _settings.BmAuthKey = value; OnPropertyChanged(); }
+    }
+    public string BmUserCorp
+    {
+        get => _settings.BmUserCorp;
+        set { _settings.BmUserCorp = value; OnPropertyChanged(); }
+    }
+    public string BmProject
+    {
+        get => _settings.BmProject;
+        set { _settings.BmProject = value; OnPropertyChanged(); }
+    }
+
     public SettingsViewModel(DatabaseService db)
     {
         _db = db;

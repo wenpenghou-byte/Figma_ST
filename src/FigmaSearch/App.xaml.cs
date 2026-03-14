@@ -7,12 +7,13 @@ namespace FigmaSearch;
 
 public partial class App : Application
 {
-    public static DatabaseService DB { get; private set; } = null!;
-    public static FigmaApiService Api { get; private set; } = null!;
-    public static UpdateService   Updater { get; private set; } = null!;
-    public static AutoSyncService AutoSync { get; private set; } = null!;
-    public static HotkeyService   Hotkey { get; private set; } = null!;
-    public static SearchWindow    SearchWin { get; private set; } = null!;
+    public static DatabaseService    DB { get; private set; } = null!;
+    public static FigmaApiService    Api { get; private set; } = null!;
+    public static UpdateService      Updater { get; private set; } = null!;
+    public static AutoSyncService    AutoSync { get; private set; } = null!;
+    public static HotkeyService      Hotkey { get; private set; } = null!;
+    public static BrainMakerService  BrainMaker { get; private set; } = null!;
+    public static SearchWindow       SearchWin { get; private set; } = null!;
     private TaskbarIcon? _trayIcon;
     // Keep mutex alive for the process lifetime to prevent second instance
     private static System.Threading.Mutex? _instanceMutex;
@@ -34,11 +35,15 @@ public partial class App : Application
         DB      = new DatabaseService();
         Api     = new FigmaApiService();
         Updater = new UpdateService();
+        BrainMaker = new BrainMakerService();
 
         var settings = DB.LoadSettings();
 
         // Apply saved theme before any window is created
         ApplyTheme(settings.Theme, persist: false);
+
+        // Configure BrainMaker AI with saved credentials
+        BrainMaker.Configure(settings.BmAuthAccount, settings.BmAuthKey, settings.BmUserCorp, settings.BmProject);
 
         // First run: show wizard
         if (settings.IsFirstRun)
@@ -157,6 +162,7 @@ public partial class App : Application
         try { _trayIcon?.Dispose(); } catch { }
         try { Hotkey?.Dispose(); } catch { }
         try { AutoSync?.Dispose(); } catch { }
+        try { BrainMaker?.Dispose(); } catch { }
         try { DB?.Dispose(); } catch { }
         try { _instanceMutex?.ReleaseMutex(); } catch { }
         try { _instanceMutex?.Dispose(); } catch { }

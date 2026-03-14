@@ -134,6 +134,39 @@
                     <TextBlock x:Name="HotkeyHint" Text="点击输入框后按下快捷键组合（需含 Ctrl/Alt/Shift 修饰键）"
                                Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,4,0,0"/>
                 </StackPanel>
+                <!-- BrainMaker AI -->
+                <StackPanel Margin="0,0,0,16">
+                    <TextBlock Text="AI 问答（BrainMaker）" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,0,0,8"
+                               Text="配置后可在搜索框中使用「问 AI」功能。凭证获取方式请联系 BrainMaker 团队。"/>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/><ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Auth Account" Foreground="{StaticResource FgPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                        <TextBox x:Name="BmAuthAccountBox" Grid.Column="1"
+                                 Style="{StaticResource SearchBox}" FontSize="13"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/><ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Auth Key" Foreground="{StaticResource FgPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                        <PasswordBox x:Name="BmAuthKeyBox" Grid.Column="1"
+                                     Background="{StaticResource BgTertiary}" Foreground="{StaticResource FgPrimary}"
+                                     BorderBrush="{StaticResource BorderColor}" Padding="10,8" FontSize="13"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/><ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="User Corp" Foreground="{StaticResource FgPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                        <TextBox x:Name="BmUserCorpBox" Grid.Column="1"
+                                 Style="{StaticResource SearchBox}" FontSize="13"/>
+                    </Grid>
+                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,2,0,0"
+                               Text="User Corp 为邮箱前缀，如 houwenpeng"/>
+                </StackPanel>
                 <!-- Check for updates -->
                 <StackPanel Margin="0,0,0,16">
                     <TextBlock Text="应用更新" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>

@@ -23,6 +23,9 @@ public partial class SearchWindow : Window
     /// key-up event causing an immediate spurious deactivation.
     /// </summary>
     private DateTime _suppressDeactivateUntil = DateTime.MinValue;
+    /// <summary>Whether the AI response area is currently shown (replaces search results).</summary>
+    private bool _isAiMode;
+    private CancellationTokenSource? _aiCts;
 
     public SearchWindow()
     {
@@ -207,6 +210,7 @@ public partial class SearchWindow : Window
     private void HideWindow()
     {
         Hide();
+        ExitAiMode();
         SearchBox.Text = "";
         _vm.ClearSearch();
         RebuildResults();
@@ -214,6 +218,8 @@ public partial class SearchWindow : Window
 
     private void SearchBox_TextChanged(object s, TextChangedEventArgs e)
     {
+        // Any text change exits AI mode and returns to normal search
+        if (_isAiMode) ExitAiMode();
         _vm.Query = SearchBox.Text;
         RebuildResults();
     }
@@ -363,6 +369,71 @@ public partial class SearchWindow : Window
     }
 
     private void FoldButton_Click(object s, RoutedEventArgs e) { }
+
+    // ── AI Ask ───────────────────────────────────────────────────
+
+    private async void AskAi_Click(object s, RoutedEventArgs e)
+    {
+        var question = SearchBox.Text.Trim();
+        if (string.IsNullOrEmpty(question)) return;
+
+        if (!App.BrainMaker.IsConfigured)
+        {
+            EnterAiMode();
+            AiStatusLabel.Visibility = Visibility.Collapsed;
+            AiResponseText.Text = "AI 功能未配置。请在「设置 → AI 问答」中填写 Auth Account、Auth Key 和 User Corp。";
+            return;
+        }
+
+        // Cancel any previous request
+        _aiCts?.Cancel();
+        _aiCts = new CancellationTokenSource();
+        var ct = _aiCts.Token;
+
+        EnterAiMode();
+        AiStatusLabel.Visibility = Visibility.Visible;
+        AiStatusLabel.Text = "正在思考…";
+        AiResponseText.Text = "";
+        AskAiBtn.IsEnabled = false;
+
+        try
+        {
+            var response = await App.BrainMaker.ChatAsync(question, ct);
+            if (ct.IsCancellationRequested) return;
+            AiStatusLabel.Visibility = Visibility.Collapsed;
+            AiResponseText.Text = response;
+        }
+        catch (OperationCanceledException)
+        {
+            // User cancelled (typed new text, pressed Esc, etc.) — do nothing
+        }
+        catch (Exception ex)
+        {
+            if (ct.IsCancellationRequested) return;
+            AiStatusLabel.Visibility = Visibility.Collapsed;
+            AiResponseText.Text = $"请求失败：{ex.Message}";
+        }
+        finally
+        {
+            AskAiBtn.IsEnabled = true;
+        }
+    }
+
+    private void EnterAiMode()
+    {
+        _isAiMode = true;
+        ResultsArea.Visibility = Visibility.Collapsed;
+        AiResultArea.Visibility = Visibility.Visible;
+    }
+
+    private void ExitAiMode()
+    {
+        _isAiMode = false;
+        _aiCts?.Cancel();
+        AiResultArea.Visibility = Visibility.Collapsed;
+        AiStatusLabel.Visibility = Visibility.Collapsed;
+        AiResponseText.Text = "";
+    }
 
     private void Window_Deactivated(object s, EventArgs e)
     {

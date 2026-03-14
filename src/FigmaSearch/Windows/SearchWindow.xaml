@@ -29,11 +29,17 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="&#128269;" VerticalAlignment="Center" Margin="0,0,8,0" FontSize="16" Opacity="0.5"/>
                 <TextBox x:Name="SearchBox" Grid.Column="1" Style="{DynamicResource SearchBoxWithHint}"
                          Background="Transparent" TextChanged="SearchBox_TextChanged"/>
-                <Button x:Name="UpdateBtn" Grid.Column="2" Style="{DynamicResource UpdateButton}"
+                <Button x:Name="AskAiBtn" Grid.Column="2" Content="问 AI" Margin="6,0,0,0"
+                        Style="{DynamicResource FlatButton}" Background="{DynamicResource BgTertiary}"
+                        Foreground="{DynamicResource AccentBlue}" Padding="10,6" FontSize="12"
+                        VerticalAlignment="Center" Click="AskAi_Click"
+                        ToolTip="将搜索框内容发送给 AI 助手"/>
+                <Button x:Name="UpdateBtn" Grid.Column="3" Style="{DynamicResource UpdateButton}"
                         Visibility="Collapsed" Click="UpdateBtn_Click" Margin="8,0,0,0">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#26356;&#26032; "/>
@@ -60,6 +66,18 @@
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               PreviewMouseWheel="ResultsScroll_PreviewMouseWheel">
                     <StackPanel x:Name="ResultsPanel" Margin="0,6,0,8"/>
+                </ScrollViewer>
+            </Border>
+            <!-- AI response area (replaces search results when active) -->
+            <Border x:Name="AiResultArea" Grid.Row="2" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0" Visibility="Collapsed">
+                <ScrollViewer MaxHeight="520" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              PreviewMouseWheel="ResultsScroll_PreviewMouseWheel">
+                    <StackPanel Margin="16,12,16,14">
+                        <TextBlock x:Name="AiStatusLabel" Text="正在思考…" FontSize="12"
+                                   Foreground="{DynamicResource FgSecondary}" Margin="0,0,0,8" Visibility="Collapsed"/>
+                        <TextBlock x:Name="AiResponseText" TextWrapping="Wrap" FontSize="13"
+                                   Foreground="{DynamicResource FgPrimary}" LineHeight="22"/>
+                    </StackPanel>
                 </ScrollViewer>
             </Border>
             <!-- Sync status bar (progress / error) -->

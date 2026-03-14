@@ -11,4 +11,10 @@ public class AppSettings
     public string AppVersion { get; set; } = "1.0.0";
     public bool IsFirstRun { get; set; } = true;
     public string Theme { get; set; } = "Dark"; // "Dark" | "Light"
+
+    // ── BrainMaker AI ────────────────────────────────────────
+    public string BmAuthAccount { get; set; } = string.Empty;
+    public string BmAuthKey { get; set; } = string.Empty;
+    public string BmUserCorp { get; set; } = string.Empty;
+    public string BmProject { get; set; } = "space_houwenpeng";
 }
