@@ -137,13 +137,14 @@ public class DatabaseService : IDisposable
         SetLastSyncTime(DateTime.UtcNow);
     }
 
-    // ── Incremental sync: upsert a single file and its pages atomically ──
+    // ── Sync: upsert a single file and optionally its pages atomically ──
     /// <summary>
-    /// Upserts one document + its pages. Safe to call multiple times (idempotent).
-    /// Called per-file so progress is saved immediately; if sync crashes, already-done
-    /// files are skipped on the next run.
+    /// Upserts one document. When <paramref name="pages"/> is non-null the file's
+    /// pages are replaced with the new list; when null the existing pages in the DB
+    /// are preserved (used when the page fetch failed but we still want the document
+    /// metadata to be searchable).
     /// </summary>
-    public void UpsertFileData(FigmaFile doc, List<FigmaPage> pages)
+    public void UpsertFileData(FigmaFile doc, List<FigmaPage>? pages)
     {
         var c   = Conn();
         var now = DateTime.UtcNow.ToString("o");
@@ -164,15 +165,18 @@ public class DatabaseService : IDisposable
         c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('document',@key,@name,@teamId,@key)",
             new { key = doc.Key, name = doc.Name, teamId = doc.TeamId }, tx);
 
-        // Replace pages for this file
-        c.Execute("DELETE FROM Pages WHERE document_key=@key", new { key = doc.Key }, tx);
-        c.Execute("DELETE FROM SearchIndex WHERE entity_type='page' AND document_key=@key", new { key = doc.Key }, tx);
-        foreach (var p in pages)
+        // Replace pages only when a new page list is provided (non-null).
+        // null means "page fetch failed — keep existing DB pages intact".
+        if (pages != null)
         {
-            // INSERT OR REPLACE handles the case where the same page id appears in multiple files
-            c.Execute("INSERT OR REPLACE INTO Pages(id,document_key,name,url) VALUES(@Id,@DocumentKey,@Name,@Url)", p, tx);
-            c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('page',@id,@name,@teamId,@docKey)",
-                new { id = p.Id, name = p.Name, teamId = doc.TeamId, docKey = doc.Key }, tx);
+            c.Execute("DELETE FROM Pages WHERE document_key=@key", new { key = doc.Key }, tx);
+            c.Execute("DELETE FROM SearchIndex WHERE entity_type='page' AND document_key=@key", new { key = doc.Key }, tx);
+            foreach (var p in pages)
+            {
+                c.Execute("INSERT OR REPLACE INTO Pages(id,document_key,name,url) VALUES(@Id,@DocumentKey,@Name,@Url)", p, tx);
+                c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('page',@id,@name,@teamId,@docKey)",
+                    new { id = p.Id, name = p.Name, teamId = doc.TeamId, docKey = doc.Key }, tx);
+            }
         }
 
         tx.Commit();

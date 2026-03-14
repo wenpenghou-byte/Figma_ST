@@ -47,8 +47,16 @@ public class SearchViewModel : INotifyPropertyChanged
         var allDocKeys = docKeys.Union(parentDocKeys).ToHashSet();
         var docs = _db.GetDocumentsByKeys(allDocKeys);
 
-        // Group by team
-        var teams = docs.GroupBy(d => d.TeamId).ToList();
+        // Build team sort order from settings (sort_order → position index)
+        var teamOrder = _db.GetTeams()
+            .Select((t, i) => (t.TeamId, Index: i))
+            .ToDictionary(x => x.TeamId, x => x.Index);
+
+        // Group by team, ordered by the user-defined team list order
+        var teams = docs
+            .GroupBy(d => d.TeamId)
+            .OrderBy(g => teamOrder.TryGetValue(g.Key, out var idx) ? idx : int.MaxValue)
+            .ToList();
 
         int totalCount = 0;
         foreach (var tg in teams)

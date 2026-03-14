@@ -55,6 +55,8 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="NewTeamId" Grid.Column="0" Margin="0,0,4,0"
                                          Style="{StaticResource SearchBox}" FontSize="13"
@@ -65,12 +67,20 @@
                                 <Button x:Name="AddTeamBtn" Grid.Column="2" Content="写入" Margin="0,0,4,0"
                                         Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
                                         Padding="12,6" IsEnabled="False" Click="AddTeam_Click"/>
-                                <Button Grid.Column="3" Content="删除选中"
+                                <Button Grid.Column="3" Content="删除选中" Margin="0,0,4,0"
                                         Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
                                         Padding="12,6" Click="RemoveTeam_Click"/>
+                                <Button Grid.Column="4" Content="▲" Margin="0,0,2,0"
+                                        Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
+                                        Padding="10,6" ToolTip="上移" Click="MoveTeamUp_Click"/>
+                                <Button Grid.Column="5" Content="▼" Margin="0,0,0,0"
+                                        Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
+                                        Padding="10,6" ToolTip="下移" Click="MoveTeamDown_Click"/>
                             </Grid>
                         </StackPanel>
                     </Border>
+                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,4,0,0"
+                               Text="列表顺序决定搜索结果的 Team 展示优先级，排在前面的 Team 优先显示。"/>
                 </StackPanel>
                 <!-- Interval + Manual sync -->
                 <StackPanel Margin="0,0,0,16">

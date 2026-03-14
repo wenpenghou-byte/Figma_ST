@@ -100,6 +100,24 @@ public partial class SettingsWindow : Window
             _vm.RemoveTeam(t);
     }
 
+    private void MoveTeamUp_Click(object s, RoutedEventArgs e)
+    {
+        if (TeamsGrid.SelectedItem is not TeamConfig t) return;
+        var idx = _vm.Teams.IndexOf(t);
+        if (idx <= 0) return;
+        _vm.Teams.Move(idx, idx - 1);
+        TeamsGrid.SelectedItem = t;
+    }
+
+    private void MoveTeamDown_Click(object s, RoutedEventArgs e)
+    {
+        if (TeamsGrid.SelectedItem is not TeamConfig t) return;
+        var idx = _vm.Teams.IndexOf(t);
+        if (idx < 0 || idx >= _vm.Teams.Count - 1) return;
+        _vm.Teams.Move(idx, idx + 1);
+        TeamsGrid.SelectedItem = t;
+    }
+
     // ── Interval / Startup ───────────────────────────────────────
 
     private void IntervalSlider_Changed(object s, RoutedPropertyChangedEventArgs<double> e)
@@ -269,25 +287,18 @@ public partial class SettingsWindow : Window
         // Apply new hotkey immediately
         App.Hotkey?.ApplyConfig(_vm.HotkeyConfig);
 
-        // Detect whether a background sync is needed
-        bool teamsAdded   = newTeamIds.Except(oldTeamIds).Any();
-        bool teamsRemoved = oldTeamIds.Except(newTeamIds).Any();
-        bool teamsChanged = teamsAdded || teamsRemoved;
+        // Only trigger sync when teams were ADDED (new data to fetch).
+        // Removing teams just deletes local data (handled by SaveTeams) — no sync needed.
+        bool teamsAdded = newTeamIds.Except(oldTeamIds).Any();
 
-        if (teamsChanged && newTeamIds.Count > 0)
+        if (teamsAdded)
         {
-            // Trigger sync and inform the user
             App.AutoSync?.RunNow(force: true);
             MessageBox.Show(
-                "检测到 Team 配置变更，已在后台开始同步文档数据。\n\n同步进度可在搜索框底部查看。",
+                "检测到新增 Team，已在后台开始同步文档数据。\n\n同步进度可在搜索框底部查看。",
                 "文档同步",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
-        }
-        else if (newTeamIds.Count > 0)
-        {
-            // No team change, but still trigger a sync to ensure data freshness
-            App.AutoSync?.RunNow(force: true);
         }
 
         Close();

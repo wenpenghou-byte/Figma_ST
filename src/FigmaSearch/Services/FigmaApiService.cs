@@ -97,7 +97,7 @@ public class FigmaApiService
         List<TeamConfig> teams,
         string token,
         IProgress<SyncProgress> progress,
-        Action<FigmaFile, List<FigmaPage>>? onFileSynced = null,
+        Action<FigmaFile, List<FigmaPage>?>? onFileSynced = null,
         Action<string, HashSet<string>>? onTeamFinished = null,
         CancellationToken ct = default)
     {
@@ -197,18 +197,15 @@ public class FigmaApiService
                     catch (Exception ex) when (ex is not FigmaAuthException && ex is not OperationCanceledException)
                     {
                         // Could not fetch pages (e.g. 403 view-only, network error).
-                        // Do NOT persist empty pages — keep whatever is already in the DB.
                         failedFiles++;
-                        System.Diagnostics.Debug.WriteLine($"[FigmaApi] Skipping pages for {fileName} ({fileKey}): {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[FigmaApi] Failed to fetch pages for {fileName} ({fileKey}): {ex.Message}");
                     }
 
-                    // ── Persist immediately, but only if pages were fetched successfully ──
-                    // This ensures we never overwrite good data with empty pages.
-                    if (pagesFetchOk)
-                    {
-                        onFileSynced?.Invoke(doc, filePages);
-                        syncedFiles++;
-                    }
+                    // Always persist the document metadata (name, URL) so it's searchable.
+                    // Only update pages when they were fetched successfully; otherwise
+                    // keep whatever pages are already in the DB.
+                    onFileSynced?.Invoke(doc, pagesFetchOk ? filePages : null);
+                    syncedFiles++;
 
                     await Task.Delay(200, ct); // respect rate limits
                 }
