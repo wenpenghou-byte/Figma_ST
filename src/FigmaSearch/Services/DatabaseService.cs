@@ -214,25 +214,33 @@ public class DatabaseService : IDisposable
     {
         if (string.IsNullOrWhiteSpace(keyword)) return (new(), new());
         var c = Conn();
+
+        var docKeys = new HashSet<string>();
+        var pageIds = new HashSet<string>();
+
+        // Strategy 1: FTS5 prefix match (fast, handles ASCII/pinyin well)
         try
         {
             var safe = keyword.Replace("\"", "\\\"");
             var fts  = $"\\\"{safe}\\\"*";
             var sql  = $"SELECT entity_type, entity_id FROM SearchIndex WHERE display_name MATCH '{fts.Replace("'","''")}' ORDER BY rank";
             var hits = c.Query<(string entity_type, string entity_id)>(sql).ToList();
-            return (
-                hits.Where(h => h.entity_type == "document").Select(h => h.entity_id).ToHashSet(),
-                hits.Where(h => h.entity_type == "page").Select(h => h.entity_id).ToHashSet()
-            );
+            foreach (var h in hits)
+            {
+                if (h.entity_type == "document") docKeys.Add(h.entity_id);
+                else if (h.entity_type == "page") pageIds.Add(h.entity_id);
+            }
         }
-        catch
-        {
-            var pat = $"%{keyword}%";
-            return (
-                c.Query<string>("SELECT key FROM Documents WHERE name LIKE @pat", new { pat }).ToHashSet(),
-                c.Query<string>("SELECT id FROM Pages WHERE name LIKE @pat", new { pat }).ToHashSet()
-            );
-        }
+        catch { /* FTS query failed — rely on LIKE below */ }
+
+        // Strategy 2: LIKE substring match (slower, but handles mid-word Chinese like 图标 in 图形图标)
+        var pat = $"%{keyword}%";
+        foreach (var k in c.Query<string>("SELECT key FROM Documents WHERE name LIKE @pat", new { pat }))
+            docKeys.Add(k);
+        foreach (var id in c.Query<string>("SELECT id FROM Pages WHERE name LIKE @pat", new { pat }))
+            pageIds.Add(id);
+
+        return (docKeys, pageIds);
     }
 
     public List<FigmaFile> GetDocumentsByKeys(IEnumerable<string> keys)

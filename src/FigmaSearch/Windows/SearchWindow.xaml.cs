@@ -228,7 +228,7 @@ public partial class SearchWindow : Window
             var lbl = new TextBlock
             {
                 Text       = group.TeamDisplayName.ToUpperInvariant(),
-                Foreground = (Brush)FindResource("FgTeamLabel"),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xF0, 0x96, 0x40)),
                 FontSize   = 10, FontWeight = FontWeights.SemiBold,
                 Margin     = new Thickness(16, 8, 0, 2)
             };
