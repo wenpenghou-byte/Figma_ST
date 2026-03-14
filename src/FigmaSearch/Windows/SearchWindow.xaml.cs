@@ -346,14 +346,34 @@ public partial class SearchWindow : Window
     {
         if (_pendingUpdate == null) return;
         UpdateBtn.IsEnabled = false;
+
+        // Show progress in the button content
+        var originalContent = UpdateBtn.Content;
+        UpdateBtn.Content = new TextBlock { Text = "正在下载安装包…", FontSize = 12 };
+
         try
         {
-            var prog = new Progress<int>();
+            var prog = new Progress<int>(percent =>
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    UpdateBtn.Content = new TextBlock
+                    {
+                        Text = percent < 100 ? $"下载中 {percent}%…" : "下载完成，正在启动安装…",
+                        FontSize = 12
+                    };
+                });
+            });
             var path = await App.Updater.DownloadInstallerAsync(_pendingUpdate.DownloadUrl, prog);
+            UpdateBtn.Content = new TextBlock { Text = "正在启动安装…", FontSize = 12 };
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             Application.Current.Shutdown();
         }
-        catch { UpdateBtn.IsEnabled = true; }
+        catch
+        {
+            UpdateBtn.Content = originalContent;
+            UpdateBtn.IsEnabled = true;
+        }
     }
 
     private void ApiErrorGotoSettings_Click(object s, RoutedEventArgs e)
