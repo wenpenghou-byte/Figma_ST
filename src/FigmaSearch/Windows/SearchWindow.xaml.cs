@@ -146,14 +146,22 @@ public partial class SearchWindow : Window
         Left = screen.Left + (screen.Width - Width) / 2;
         Top  = screen.Top  + screen.Height * 0.22;
         base.Show();
-
-        // Activate and focus
         Activate();
-        SearchBox.Focus();
-        Keyboard.Focus(SearchBox);
 
         // Install global mouse hook to detect clicks outside the window
         InstallMouseHook();
+
+        // Delay focus acquisition so the Alt key-up from DoubleAlt finishes
+        // processing first. Without this, Windows steals focus right back.
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (!IsVisible) return;
+            var hwnd = new WindowInteropHelper(this).EnsureHandle();
+            NativeMethods.SetForegroundWindow(hwnd);
+            Activate();
+            SearchBox.Focus();
+            Keyboard.Focus(SearchBox);
+        }, DispatcherPriority.Input);
 
         // Restore persistent error if any
         if (_syncErrorMessage != null)
@@ -510,6 +518,10 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
     public static extern IntPtr GetModuleHandle(string lpModuleName);
