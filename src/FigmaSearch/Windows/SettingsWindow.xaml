@@ -180,9 +180,9 @@
                 </StackPanel>
                 <!-- Contact -->
                 <StackPanel Margin="0,0,0,8">
-                    <TextBlock Text="联系方式" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+                    <TextBlock Text="问题反馈" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
                     <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="12">
-                        欢迎交流：<Hyperlink NavigateUri="mailto:houwenpeng@corp.netease.com"
+                        问题反馈：<Hyperlink NavigateUri="mailto:houwenpeng@corp.netease.com"
                                              RequestNavigate="ContactLink_RequestNavigate"
                                              Foreground="{StaticResource AccentBlue}">houwenpeng@corp.netease.com</Hyperlink>
                     </TextBlock>
