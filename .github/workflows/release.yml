@@ -42,9 +42,13 @@ jobs:
       - name: Install NSIS
         shell: pwsh
         run: |
-          choco install nsis -y
-          $env:PATH += ";C:\Program Files (x86)\NSIS"
-          echo "C:\Program Files (x86)\NSIS" | Out-File -Append -FilePath $env:GITHUB_PATH
+          choco install nsis -y --no-progress
+          # Refresh PATH to pick up NSIS installation
+          Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+          refreshenv
+          # Also ensure both possible install locations are in PATH
+          echo "C:\Program Files (x86)\NSIS" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+          echo "C:\Program Files\NSIS" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
 
       - name: Create dist folder
         shell: bash
@@ -53,7 +57,16 @@ jobs:
       - name: Build NSIS installer
         shell: pwsh
         working-directory: installer
-        run: makensis /DPRODUCT_VERSION=${{ steps.version.outputs.version }} setup.nsi
+        run: |
+          # Try both possible NSIS locations
+          $nsisPath = if (Test-Path "C:\Program Files (x86)\NSIS\makensis.exe") {
+            "C:\Program Files (x86)\NSIS\makensis.exe"
+          } elseif (Test-Path "C:\Program Files\NSIS\makensis.exe") {
+            "C:\Program Files\NSIS\makensis.exe"
+          } else {
+            "makensis"  # fall back to PATH
+          }
+          & $nsisPath /DPRODUCT_VERSION=${{ steps.version.outputs.version }} setup.nsi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

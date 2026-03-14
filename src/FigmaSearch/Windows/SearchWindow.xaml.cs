@@ -15,19 +15,18 @@ namespace FigmaSearch.Windows;
 public partial class SearchWindow : Window
 {
      private readonly SearchViewModel _vm;
-     private UpdateInfo? _pendingUpdate;
-     private bool _hasBeenShown;
-     private string? _syncErrorMessage;
+      private UpdateInfo? _pendingUpdate;
+      private bool _hasBeenShown;
+      private string? _syncErrorMessage;
 
-     /// <summary>
-     /// Incremented on every ShowWindow call. Callbacks from previous cycles
-     /// check this and no-op if stale, preventing cross-cycle state corruption.
-     /// </summary>
-     private int _showGeneration;
-     private bool _suppressDeactivate; // brief guard during ShowWindow activation
-     /// <summary>Whether the AI response area is currently shown (replaces search results).</summary>
-     private bool _isAiMode;
-     private CancellationTokenSource? _aiCts;
+      // ── AI mode (from v2-dev) ───────────────────────────────────
+      /// <summary>Whether the AI response area is currently shown (replaces search results).</summary>
+      private bool _isAiMode;
+      private CancellationTokenSource? _aiCts;
+
+      // ── Global mouse hook for outside-click detection (from main) ───
+      private IntPtr _mouseHookId;
+      private NativeMethods.LowLevelMouseProc? _mouseHookProc; // prevent GC
 
     public SearchWindow()
     {
@@ -142,22 +141,19 @@ public partial class SearchWindow : Window
     private void ShowWindow()
     {
         _hasBeenShown = true;
-        _suppressDeactivate = true;
-        var gen = ++_showGeneration; // invalidate any pending callbacks from previous cycles
 
         var screen = System.Windows.SystemParameters.WorkArea;
         Left = screen.Left + (screen.Width - Width) / 2;
         Top  = screen.Top  + screen.Height * 0.22;
         base.Show();
 
-        // Use ApplicationIdle priority so activation runs after Windows finishes
-        // processing the Alt key-up from DoubleAlt. Single-shot, generation-guarded.
-        Dispatcher.BeginInvoke((Action)(() =>
-        {
-            if (gen != _showGeneration) return; // stale callback from previous cycle
-            if (!IsVisible) return;
-            ForceActivateAndFocus(gen);
-        }), DispatcherPriority.ApplicationIdle);
+        // Activate and focus
+        Activate();
+        SearchBox.Focus();
+        Keyboard.Focus(SearchBox);
+
+        // Install global mouse hook to detect clicks outside the window
+        InstallMouseHook();
 
         // Restore persistent error if any
         if (_syncErrorMessage != null)
@@ -167,44 +163,62 @@ public partial class SearchWindow : Window
             ShowSyncProgress("正在同步文档…（视文档数量，可能需要几分钟到几十分钟，已拉取的文档可搜索）");
     }
 
-    /// <summary>
-    /// Uses Win32 AttachThreadInput + SetForegroundWindow to reliably steal focus
-    /// from whatever window currently owns it, then sets WPF keyboard focus to
-    /// the search TextBox. Generation-guarded: no-ops if a newer ShowWindow cycle started.
-    /// </summary>
-    private void ForceActivateAndFocus(int gen)
-    {
-        if (gen != _showGeneration || !IsVisible) return;
-
-        var hwnd = new WindowInteropHelper(this).EnsureHandle();
-
-        var foregroundHwnd = GetForegroundWindow();
-        var foregroundThread = GetWindowThreadProcessId(foregroundHwnd, IntPtr.Zero);
-        var ourThread = GetWindowThreadProcessId(hwnd, IntPtr.Zero);
-
-        bool attached = false;
-        if (foregroundThread != ourThread)
-            attached = AttachThreadInput(foregroundThread, ourThread, true);
-
-        try { SetForegroundWindow(hwnd); }
-        finally { if (attached) AttachThreadInput(foregroundThread, ourThread, false); }
-
-        Activate();
-        SearchBox.Focus();
-        Keyboard.Focus(SearchBox);
-
-        // Now that we're activated, allow Deactivated to function normally.
-        _suppressDeactivate = false;
-    }
-
     private void HideWindow()
     {
-        _suppressDeactivate = false;
+        UninstallMouseHook();
         Hide();
         ExitAiMode();
         SearchBox.Text = "";
         _vm.ClearSearch();
         RebuildResults();
+    }
+
+    // ── Global mouse hook ────────────────────────────────────────
+
+    private void InstallMouseHook()
+    {
+        if (_mouseHookId != IntPtr.Zero) return; // already installed
+        _mouseHookProc = MouseHookCallback;
+        using var proc = System.Diagnostics.Process.GetCurrentProcess();
+        using var mod = proc.MainModule!;
+        _mouseHookId = NativeMethods.SetWindowsHookEx(
+            NativeMethods.WH_MOUSE_LL, _mouseHookProc,
+            NativeMethods.GetModuleHandle(mod.ModuleName), 0);
+    }
+
+    private void UninstallMouseHook()
+    {
+        if (_mouseHookId != IntPtr.Zero)
+        {
+            NativeMethods.UnhookWindowsHookEx(_mouseHookId);
+            _mouseHookId = IntPtr.Zero;
+        }
+    }
+
+    private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0 && IsVisible)
+        {
+            int msg = (int)wParam;
+            // React to any mouse button down
+            if (msg == NativeMethods.WM_LBUTTONDOWN ||
+                msg == NativeMethods.WM_RBUTTONDOWN ||
+                msg == NativeMethods.WM_MBUTTONDOWN)
+            {
+                // Get click position
+                var hookStruct = Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
+                var clickPoint = new System.Windows.Point(hookStruct.pt.x, hookStruct.pt.y);
+
+                // Check if click is outside our window bounds
+                var windowRect = new System.Windows.Rect(Left, Top, ActualWidth, ActualHeight);
+                if (!windowRect.Contains(clickPoint))
+                {
+                    // Dispatch hide on UI thread (we're in the hook callback)
+                    Dispatcher.BeginInvoke(new Action(HideWindow));
+                }
+            }
+        }
+        return NativeMethods.CallNextHookEx(_mouseHookId, nCode, wParam, lParam);
     }
 
     private void SearchBox_TextChanged(object s, TextChangedEventArgs e)
@@ -450,8 +464,8 @@ public partial class SearchWindow : Window
     {
         if (!_hasBeenShown) return;
         if (App.IsSettingsOpen) return;
-        if (_suppressDeactivate) return; // ShowWindow activation in progress
-        HideWindow();
+        // Backup: also hide on deactivation (mouse hook is the primary mechanism)
+        if (IsVisible) HideWindow();
     }
     private void Window_KeyDown(object s, KeyEventArgs e)
     {
@@ -462,19 +476,41 @@ public partial class SearchWindow : Window
         if (s is ScrollViewer sv) { sv.ScrollToVerticalOffset(sv.VerticalOffset - e.Delta / 3.0); e.Handled = true; }
     }
 
-    // ── Win32 P/Invoke for reliable window activation ────────────
+    // ── Win32 P/Invoke ─────────────────────────────────────────────
+}
 
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetForegroundWindow();
+internal static class NativeMethods
+{
+    public const int WH_MOUSE_LL = 14;
+    public const int WM_LBUTTONDOWN = 0x0201;
+    public const int WM_RBUTTONDOWN = 0x0204;
+    public const int WM_MBUTTONDOWN = 0x0207;
 
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT { public int x, y; }
 
-    [DllImport("user32.dll")]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MSLLHOOKSTRUCT
+    {
+        public POINT pt;
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+
+    [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
+    public static extern bool UnhookWindowsHookEx(IntPtr hhk);
 
     [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
+    public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+    public static extern IntPtr GetModuleHandle(string lpModuleName);
 }
