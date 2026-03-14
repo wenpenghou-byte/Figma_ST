@@ -146,22 +146,25 @@ public partial class SearchWindow : Window
         Left = screen.Left + (screen.Width - Width) / 2;
         Top  = screen.Top  + screen.Height * 0.22;
         base.Show();
-        Activate();
 
         // Install global mouse hook to detect clicks outside the window
         InstallMouseHook();
 
-        // Delay focus acquisition so the Alt key-up from DoubleAlt finishes
-        // processing first. Without this, Windows steals focus right back.
-        Dispatcher.InvokeAsync(() =>
+        // Delay focus acquisition with a real timer (150ms) so the Alt key-up
+        // from DoubleAlt is fully processed by Windows before we steal focus.
+        // DispatcherPriority-based delays are not enough — Alt-up processing
+        // happens outside the WPF dispatcher queue.
+        var focusTimer = new DispatcherTimer(DispatcherPriority.Send)
         {
+            Interval = TimeSpan.FromMilliseconds(150)
+        };
+        focusTimer.Tick += (_, _) =>
+        {
+            focusTimer.Stop();
             if (!IsVisible) return;
-            var hwnd = new WindowInteropHelper(this).EnsureHandle();
-            NativeMethods.SetForegroundWindow(hwnd);
-            Activate();
-            SearchBox.Focus();
-            Keyboard.Focus(SearchBox);
-        }, DispatcherPriority.Input);
+            ForceFocusSearchBox();
+        };
+        focusTimer.Start();
 
         // Restore persistent error if any
         if (_syncErrorMessage != null)
@@ -179,6 +182,36 @@ public partial class SearchWindow : Window
         SearchBox.Text = "";
         _vm.ClearSearch();
         RebuildResults();
+    }
+
+    /// <summary>
+    /// Forcefully grabs foreground and keyboard focus using Win32 APIs.
+    /// Uses AttachThreadInput to bypass Windows' foreground lock.
+    /// </summary>
+    private void ForceFocusSearchBox()
+    {
+        var hwnd = new WindowInteropHelper(this).EnsureHandle();
+        var foregroundHwnd = NativeMethods.GetForegroundWindow();
+        var foregroundThread = NativeMethods.GetWindowThreadProcessId(foregroundHwnd, IntPtr.Zero);
+        var ourThread = NativeMethods.GetWindowThreadProcessId(hwnd, IntPtr.Zero);
+
+        bool attached = false;
+        if (foregroundThread != ourThread)
+            attached = NativeMethods.AttachThreadInput(foregroundThread, ourThread, true);
+
+        try
+        {
+            NativeMethods.SetForegroundWindow(hwnd);
+        }
+        finally
+        {
+            if (attached)
+                NativeMethods.AttachThreadInput(foregroundThread, ourThread, false);
+        }
+
+        Activate();
+        SearchBox.Focus();
+        Keyboard.Focus(SearchBox);
     }
 
     // ── Global mouse hook ────────────────────────────────────────
@@ -522,6 +555,16 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
     public static extern IntPtr GetModuleHandle(string lpModuleName);
