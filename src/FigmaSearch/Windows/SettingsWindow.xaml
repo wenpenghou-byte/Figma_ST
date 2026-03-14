@@ -140,6 +140,15 @@
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="CheckUpdateBtn" Content="检查更新" Style="{StaticResource FlatButton}"
                                 Background="{StaticResource BgHover}" Padding="14,8" Click="CheckUpdate_Click"/>
+                        <Button x:Name="InstallUpdateBtn" Visibility="Collapsed" Style="{StaticResource FlatButton}"
+                                Background="{StaticResource AccentBlue}" Foreground="White" Padding="14,8" Click="InstallUpdate_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="立即更新 "/>
+                                <Border Background="#E8443A" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
+                                    <TextBlock Text="NEW" FontSize="9" Foreground="White" FontWeight="Bold"/>
+                                </Border>
+                            </StackPanel>
+                        </Button>
                         <TextBlock x:Name="UpdateStatus" Margin="12,0,0,0"
                                    Foreground="{StaticResource FgSecondary}" VerticalAlignment="Center" FontSize="12"/>
                     </StackPanel>

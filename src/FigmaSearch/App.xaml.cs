@@ -13,6 +13,9 @@ public partial class App : Application
     public static AutoSyncService AutoSync { get; private set; } = null!;
     public static HotkeyService   Hotkey { get; private set; } = null!;
     public static SearchWindow    SearchWin { get; private set; } = null!;
+
+    /// <summary>Global pending update info, shared between SearchWindow and SettingsWindow.</summary>
+    public static UpdateInfo? PendingUpdate { get; set; }
     private TaskbarIcon? _trayIcon;
     // Keep mutex alive for the process lifetime to prevent second instance
     private static System.Threading.Mutex? _instanceMutex;
@@ -85,7 +88,10 @@ public partial class App : Application
     {
         var info = await Updater.CheckForUpdateAsync();
         if (info?.IsNewer == true)
+        {
+            PendingUpdate = info;
             Dispatcher.Invoke(() => SearchWin.ShowUpdateBadge(info));
+        }
     }
 
     private void OnSyncFailed(Exception ex)
