@@ -116,7 +116,7 @@ public class HotkeyService : IDisposable
         _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(module.ModuleName!), 0);
     }
 
-    private bool _swallowNextAltUp; // suppress Alt key-up after DoubleAlt fires
+    private bool _fireOnNextAltUp; // defer hotkey event to Alt key-up
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
@@ -130,28 +130,29 @@ public class HotkeyService : IDisposable
 
                 if (isDown && !_altIsDown)
                 {
-                    // First real press (not auto-repeat, since _altIsDown guards that)
                     _altIsDown = true;
                     var now = DateTime.Now;
                     if ((now - _lastAltRelease) < _doubleTapInterval)
                     {
-                        // Second press within interval after previous release = double tap
+                        // Double tap detected — defer firing until key-up
                         _lastAltRelease = DateTime.MinValue;
-                        _swallowNextAltUp = true; // eat the upcoming Alt-up to prevent Windows from stealing focus
-                        _dispatcher.BeginInvoke(() => HotkeyPressed?.Invoke(this, EventArgs.Empty));
+                        _fireOnNextAltUp = true;
                     }
                 }
                 else if (isUp)
                 {
                     _altIsDown = false;
-                    _lastAltRelease = DateTime.Now;
-                    if (_swallowNextAltUp)
+                    if (_fireOnNextAltUp)
                     {
-                        _swallowNextAltUp = false;
-                        // Return non-zero to swallow this key event — prevents Windows
-                        // from processing Alt-up which would activate the system menu
-                        // or Start menu, stealing focus from the search window.
+                        _fireOnNextAltUp = false;
+                        // Fire the hotkey now that Alt is released — no stuck Alt state.
+                        // Swallow this Alt-up to prevent Start menu activation.
+                        _dispatcher.BeginInvoke(() => HotkeyPressed?.Invoke(this, EventArgs.Empty));
                         return (IntPtr)1;
+                    }
+                    else
+                    {
+                        _lastAltRelease = DateTime.Now;
                     }
                 }
             }
@@ -159,7 +160,7 @@ public class HotkeyService : IDisposable
             {
                 // Any other key pressed while Alt is held — not a clean double-tap
                 _lastAltRelease = DateTime.MinValue;
-                _swallowNextAltUp = false;
+                _fireOnNextAltUp = false;
             }
         }
         return CallNextHookEx(_hookId, nCode, wParam, lParam);
