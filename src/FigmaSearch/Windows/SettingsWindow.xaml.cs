@@ -260,11 +260,36 @@ public partial class SettingsWindow : Window
 
     private void Save_Click(object s, RoutedEventArgs e)
     {
+        // Snapshot old teams before saving to detect changes
+        var oldTeamIds = App.DB.GetTeams().Select(t => t.TeamId).ToHashSet();
+        var newTeamIds = _vm.Teams.Select(t => t.TeamId).ToHashSet();
+
         _vm.Save();
+
         // Apply new hotkey immediately
         App.Hotkey?.ApplyConfig(_vm.HotkeyConfig);
-        // Trigger background sync so new/changed teams are fetched immediately
-        App.AutoSync?.RunNow(force: true);
+
+        // Detect whether a background sync is needed
+        bool teamsAdded   = newTeamIds.Except(oldTeamIds).Any();
+        bool teamsRemoved = oldTeamIds.Except(newTeamIds).Any();
+        bool teamsChanged = teamsAdded || teamsRemoved;
+
+        if (teamsChanged && newTeamIds.Count > 0)
+        {
+            // Trigger sync and inform the user
+            App.AutoSync?.RunNow(force: true);
+            MessageBox.Show(
+                "检测到 Team 配置变更，已在后台开始同步文档数据。\n\n同步进度可在搜索框底部查看。",
+                "文档同步",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        else if (newTeamIds.Count > 0)
+        {
+            // No team change, but still trigger a sync to ensure data freshness
+            App.AutoSync?.RunNow(force: true);
+        }
+
         Close();
     }
 

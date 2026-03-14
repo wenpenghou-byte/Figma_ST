@@ -2,10 +2,13 @@
 using FigmaSearch.Services;
 using FigmaSearch.ViewModels;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace FigmaSearch.Windows;
 
@@ -133,8 +136,11 @@ public partial class SearchWindow : Window
         Left = screen.Left + (screen.Width - Width) / 2;
         Top  = screen.Top  + screen.Height * 0.22;
         base.Show();
-        SearchBox.Focus();
-        Activate();
+
+        // Force Windows-level activation so keyboard input goes to this window,
+        // not the desktop. Required for overlay windows (WindowStyle=None,
+        // ShowInTaskbar=False) activated from a global hotkey hook.
+        ForceActivateAndFocus();
 
         // Restore persistent error if any
         if (_syncErrorMessage != null)
@@ -142,6 +148,47 @@ public partial class SearchWindow : Window
         // Or show progress if sync is running
         else if (App.AutoSync?.IsSyncing == true)
             ShowSyncProgress("正在同步文档…（视文档数量，可能需要几分钟到几十分钟，已拉取的文档可搜索）");
+    }
+
+    /// <summary>
+    /// Uses Win32 AttachThreadInput + SetForegroundWindow to reliably steal focus
+    /// from whatever window currently owns it, then sets WPF keyboard focus to
+    /// the search TextBox via a deferred Dispatcher callback.
+    /// </summary>
+    private void ForceActivateAndFocus()
+    {
+        var hwnd = new WindowInteropHelper(this).EnsureHandle();
+
+        // Attach our thread to the foreground window's thread so Windows allows
+        // us to call SetForegroundWindow (otherwise it silently fails).
+        var foregroundHwnd = GetForegroundWindow();
+        var foregroundThread = GetWindowThreadProcessId(foregroundHwnd, IntPtr.Zero);
+        var ourThread = GetWindowThreadProcessId(hwnd, IntPtr.Zero);
+
+        bool attached = false;
+        if (foregroundThread != ourThread)
+        {
+            attached = AttachThreadInput(foregroundThread, ourThread, true);
+        }
+
+        try
+        {
+            SetForegroundWindow(hwnd);
+        }
+        finally
+        {
+            if (attached)
+                AttachThreadInput(foregroundThread, ourThread, false);
+        }
+
+        Activate();
+
+        // Defer keyboard focus until after WPF finishes layout/render.
+        Dispatcher.InvokeAsync(() =>
+        {
+            SearchBox.Focus();
+            Keyboard.Focus(SearchBox);
+        }, DispatcherPriority.Input);
     }
 
     private void HideWindow()
@@ -297,4 +344,20 @@ public partial class SearchWindow : Window
     {
         if (s is ScrollViewer sv) { sv.ScrollToVerticalOffset(sv.VerticalOffset - e.Delta / 3.0); e.Handled = true; }
     }
+
+    // ── Win32 P/Invoke for reliable window activation ────────────
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
 }

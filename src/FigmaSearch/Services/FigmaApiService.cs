@@ -87,8 +87,9 @@ public class FigmaApiService
     }
 
     /// <summary>
-    /// Incremental sync: fetches all teams' files, persisting each file immediately.
-    /// Files already present in <paramref name="alreadySyncedKeys"/> are skipped (resume support).
+    /// Full sync: fetches all teams' files and ALL pages for every file.
+    /// Every file's pages are always re-fetched to guarantee completeness.
+    /// If a file's page fetch fails (403, network, etc.), existing DB pages are preserved.
     /// After a team fully completes, calls <paramref name="onTeamFinished"/> so callers can
     /// clean up deleted files.
     /// </summary>
@@ -96,13 +97,10 @@ public class FigmaApiService
         List<TeamConfig> teams,
         string token,
         IProgress<SyncProgress> progress,
-        Dictionary<string, string>? alreadySyncedKeys = null,
         Action<FigmaFile, List<FigmaPage>>? onFileSynced = null,
         Action<string, HashSet<string>>? onTeamFinished = null,
         CancellationToken ct = default)
     {
-        alreadySyncedKeys ??= new Dictionary<string, string>();
-
         for (int ti = 0; ti < teams.Count; ti++)
         {
             ct.ThrowIfCancellationRequested();
@@ -118,7 +116,7 @@ public class FigmaApiService
             });
 
             var teamFileKeys = new HashSet<string>(); // tracks all file keys seen for this team
-            int newFiles = 0, skippedFiles = 0;
+            int syncedFiles = 0, failedFiles = 0;
 
             var projectsDoc = await GetAsync($"{BASE}/teams/{team.TeamId}/projects", token, throwOnForbidden: true, ct);
             var projects = projectsDoc.GetProperty("projects").EnumerateArray().ToList();
@@ -153,23 +151,6 @@ public class FigmaApiService
                                        ? (lmProp.GetString() ?? "") : "";
 
                     teamFileKeys.Add(fileKey);
-
-                    // ── Skip if file exists AND last_modified hasn't changed ──
-                    if (alreadySyncedKeys.TryGetValue(fileKey, out var storedLm)
-                        && storedLm == lastModified
-                        && !string.IsNullOrEmpty(lastModified))
-                    {
-                        skippedFiles++;
-                        progress.Report(new SyncProgress
-                        {
-                            Phase    = "已跳过（未修改）",
-                            TeamName = team.DisplayName,
-                            Current  = fi + 1,
-                            Total    = files.Count,
-                            Detail   = fileName
-                        });
-                        continue;
-                    }
 
                     progress.Report(new SyncProgress
                     {
@@ -217,16 +198,17 @@ public class FigmaApiService
                     {
                         // Could not fetch pages (e.g. 403 view-only, network error).
                         // Do NOT persist empty pages — keep whatever is already in the DB.
+                        failedFiles++;
                         System.Diagnostics.Debug.WriteLine($"[FigmaApi] Skipping pages for {fileName} ({fileKey}): {ex.Message}");
                     }
 
-                    // ── Persist immediately after each file, but only if pages were fetched successfully ──
+                    // ── Persist immediately, but only if pages were fetched successfully ──
+                    // This ensures we never overwrite good data with empty pages.
                     if (pagesFetchOk)
                     {
                         onFileSynced?.Invoke(doc, filePages);
-                        alreadySyncedKeys[fileKey] = lastModified; // update in-memory cache for resume
+                        syncedFiles++;
                     }
-                    newFiles++;
 
                     await Task.Delay(200, ct); // respect rate limits
                 }
@@ -235,13 +217,16 @@ public class FigmaApiService
             // Notify caller so it can clean up files deleted from Figma
             onTeamFinished?.Invoke(team.TeamId, teamFileKeys);
 
+            var detail2 = failedFiles > 0
+                ? $"同步 {syncedFiles} 个文件，{failedFiles} 个文件获取失败（已保留旧数据）"
+                : $"同步 {syncedFiles} 个文件";
             progress.Report(new SyncProgress
             {
                 Phase    = $"已完成 {team.DisplayName}",
                 TeamName = team.DisplayName,
                 Current  = ti + 1,
                 Total    = teams.Count,
-                Detail   = $"新增/更新 {newFiles} 个文件，跳过 {skippedFiles} 个"
+                Detail   = detail2
             });
         }
 

@@ -88,19 +88,12 @@ public class AutoSyncService : IDisposable
             var teams = _db.GetTeams();
             if (teams.Count == 0) return;
 
-            // Collect already-synced files with their last_modified timestamps
-            // (used to skip files that haven't changed in Figma)
-            var alreadySynced = teams
-                .SelectMany(t => _db.GetSyncedFileKeys(t.TeamId))
-                .ToDictionary(kv => kv.Key, kv => kv.Value);
-
             var progress = new Progress<SyncProgress>(p => SyncProgressChanged?.Invoke(p));
 
             await _api.SyncAllTeamsAsync(
                 teams,
                 settings.FigmaApiKey,
                 progress,
-                alreadySyncedKeys: alreadySynced,
                 onFileSynced:      (doc, pages) => _db.UpsertFileData(doc, pages),
                 onTeamFinished:    (teamId, currentKeys) =>
                 {
