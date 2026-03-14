@@ -286,7 +286,7 @@ public partial class SearchWindow : Window
             docGrid.Children.Add(foldBtn);
         }
 
-        docGrid.MouseLeftButtonUp += (_, _) => OpenUrl(item.DocumentUrl);
+        docGrid.MouseLeftButtonUp += (_, _) => { OpenUrl(item.DocumentUrl); HideWindow(); };
         docGrid.MouseEnter += (_, _) => docGrid.Background = (Brush)FindResource("BgHover");
         docGrid.MouseLeave += (_, _) => docGrid.Background = Brushes.Transparent;
         outer.Children.Add(docGrid);
@@ -304,7 +304,7 @@ public partial class SearchWindow : Window
                 FontSize   = 13
             };
             pageGrid.Children.Add(pageText);
-            pageGrid.MouseLeftButtonUp += (_, _) => OpenUrl(page.PageUrl);
+            pageGrid.MouseLeftButtonUp += (_, _) => { OpenUrl(page.PageUrl); HideWindow(); };
             pageGrid.MouseEnter += (_, _) => pageGrid.Background = (Brush)FindResource("BgHover");
             pageGrid.MouseLeave += (_, _) => pageGrid.Background = Brushes.Transparent;
             pagesPanel.Children.Add(pageGrid);
