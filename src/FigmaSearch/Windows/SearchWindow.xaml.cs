@@ -18,11 +18,6 @@ public partial class SearchWindow : Window
     private UpdateInfo? _pendingUpdate;
     private bool _hasBeenShown;
     private string? _syncErrorMessage;
-    /// <summary>
-    /// Briefly suppress Deactivated after ShowWindow() to avoid the DoubleAlt
-    /// key-up event causing an immediate spurious deactivation.
-    /// </summary>
-    private DateTime _suppressDeactivateUntil = DateTime.MinValue;
 
     public SearchWindow()
     {
@@ -137,11 +132,6 @@ public partial class SearchWindow : Window
     private void ShowWindow()
     {
         _hasBeenShown = true;
-        // Suppress Deactivated briefly — on DoubleAlt the pending Alt-up event
-        // causes Windows to steal focus right after we show, triggering a
-        // spurious Deactivated before ForceActivateAndFocus completes.
-        _suppressDeactivateUntil = DateTime.UtcNow.AddMilliseconds(200);
-
         var screen = System.Windows.SystemParameters.WorkArea;
         Left = screen.Left + (screen.Width - Width) / 2;
         Top  = screen.Top  + screen.Height * 0.22;
@@ -388,15 +378,6 @@ public partial class SearchWindow : Window
     {
         if (!_hasBeenShown) return;
         if (App.IsSettingsOpen) return;
-        // After ShowWindow() we suppress Deactivated for a short window because
-        // DoubleAlt's pending Alt key-up causes Windows to immediately steal
-        // focus, which would hide the window before the user sees it.
-        if (DateTime.UtcNow < _suppressDeactivateUntil)
-        {
-            // Re-activate instead of hiding — the user just opened the window.
-            ForceActivateAndFocus();
-            return;
-        }
         HideWindow();
     }
     private void Window_KeyDown(object s, KeyEventArgs e)
