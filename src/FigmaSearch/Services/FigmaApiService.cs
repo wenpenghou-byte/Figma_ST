@@ -73,6 +73,15 @@ public class FigmaApiService
                 continue;
             }
 
+            // Log non-success responses before throwing to aid debugging (e.g. 404 on teams endpoint)
+            if (!resp.IsSuccessStatusCode)
+            {
+                var body = "";
+                try { body = await resp.Content.ReadAsStringAsync(ct); } catch { }
+                System.Diagnostics.Debug.WriteLine(
+                    $"[FigmaApi] HTTP {(int)resp.StatusCode} {resp.StatusCode} for {url} — body: {body}");
+            }
+
             resp.EnsureSuccessStatusCode();
             var json = await resp.Content.ReadAsStringAsync(ct);
             return JsonDocument.Parse(json).RootElement;
@@ -122,12 +131,22 @@ public class FigmaApiService
             int syncedFiles = 0, failedFiles = 0;
             bool teamFullyCompleted = true; // tracks whether ALL files in this team were processed
 
+            var teamUrl = $"{BASE}/teams/{team.TeamId}/projects";
+            System.Diagnostics.Debug.WriteLine(
+                $"[FigmaApi] Fetching projects for team '{team.DisplayName}' (TeamId='{team.TeamId}'): {teamUrl}");
+
             JsonElement projectsDoc;
             try
             {
-                projectsDoc = await GetAsync($"{BASE}/teams/{team.TeamId}/projects", token, throwOnForbidden: true, ct);
+                projectsDoc = await GetAsync(teamUrl, token, throwOnForbidden: true, ct);
             }
             catch (OperationCanceledException) { return; }
+            catch (Exception ex) when (ex is not FigmaAuthException)
+            {
+                // Re-throw with enriched context so the user / logs can identify which team failed
+                throw new HttpRequestException(
+                    $"Team「{team.DisplayName}」(ID: {team.TeamId}) 请求失败: {ex.Message}", ex);
+            }
 
             var projects = projectsDoc.GetProperty("projects").EnumerateArray().ToList();
 

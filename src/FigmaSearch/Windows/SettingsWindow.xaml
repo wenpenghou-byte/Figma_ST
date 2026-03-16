@@ -36,7 +36,13 @@
                 </StackPanel>
                 <!-- Teams -->
                 <StackPanel Margin="0,0,0,16">
-                    <TextBlock Text="Team IDs" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Team IDs" Foreground="{StaticResource FgSecondary}" FontSize="12"/>
+                        <Button Content="?" Margin="6,0,0,0"
+                                Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
+                                Foreground="{StaticResource FgSecondary}" Padding="6,1" FontSize="11"
+                                ToolTip="如何获取 Team ID？" Click="TeamIdHelp_Click"/>
+                    </StackPanel>
                     <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4">
                         <StackPanel>
                             <DataGrid x:Name="TeamsGrid" Background="{StaticResource BgTertiary}"
@@ -80,6 +86,10 @@
                         </StackPanel>
                     </Border>
                     <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,4,0,0"
+                               Text="Team ID 为纯数字，可从 Figma 团队页面 URL 中获取（如 figma.com/files/team/数字ID）"/>
+                    <TextBlock x:Name="TeamIdError" Foreground="OrangeRed" FontSize="11" Margin="0,2,0,0"
+                               Visibility="Collapsed" TextWrapping="Wrap"/>
+                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,2,0,0"
                                Text="列表顺序决定搜索结果的 Team 展示优先级，排在前面的 Team 优先显示。"/>
                 </StackPanel>
                 <!-- Interval + Manual sync -->

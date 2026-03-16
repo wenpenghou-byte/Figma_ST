@@ -51,9 +51,17 @@ public partial class SettingsWindow : Window
     private void ApiKeyBox_Changed(object s, RoutedEventArgs e) =>
         _vm.FigmaApiKey = ApiKeyBox.Password;
 
+    private static readonly string HelpUrl = "https://docs.popo.netease.com/team/pc/5_63c60p/pageDetail/82a0a23187c74981ba8461b780f78ac9";
+
     private void ApiKeyHelp_Click(object s, RoutedEventArgs e)
     {
-        try { Process.Start(new ProcessStartInfo("https://icn5csa86jjp.feishu.cn/wiki/YkeawdgdyiyhT1kBdowcy8qfn8a") { UseShellExecute = true }); }
+        try { Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true }); }
+        catch { }
+    }
+
+    private void TeamIdHelp_Click(object s, RoutedEventArgs e)
+    {
+        try { Process.Start(new ProcessStartInfo(HelpUrl) { UseShellExecute = true }); }
         catch { }
     }
 
@@ -75,10 +83,20 @@ public partial class SettingsWindow : Window
 
     private void AddTeam_Click(object s, RoutedEventArgs e)
     {
-        var id = NewTeamId.Text.Trim();
-        var name = NewTeamName.Text.Trim();
-        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(name)) return;
-        _vm.AddTeam(id, name);
+        var rawId = NewTeamId.Text.Trim();
+        var name  = NewTeamName.Text.Trim();
+        if (string.IsNullOrEmpty(rawId) || string.IsNullOrEmpty(name)) return;
+
+        var error = TeamConfig.ValidateTeamId(rawId, out var cleanedId);
+        if (error != null)
+        {
+            TeamIdError.Text = error;
+            TeamIdError.Visibility = Visibility.Visible;
+            return;
+        }
+
+        TeamIdError.Visibility = Visibility.Collapsed;
+        _vm.AddTeam(cleanedId, name);
         NewTeamId.Text = "";
         NewTeamName.Text = "";
     }
@@ -88,6 +106,8 @@ public partial class SettingsWindow : Window
         if (AddTeamBtn == null) return;
         AddTeamBtn.IsEnabled = !string.IsNullOrWhiteSpace(NewTeamId.Text)
                              && !string.IsNullOrWhiteSpace(NewTeamName.Text);
+        // Clear previous validation error when user edits
+        if (TeamIdError != null) TeamIdError.Visibility = Visibility.Collapsed;
     }
 
     private void RemoveTeam_Click(object s, RoutedEventArgs e)

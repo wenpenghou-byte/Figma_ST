@@ -38,7 +38,13 @@
             <TextBlock x:Name="ApiKeyHint" Text="请输入 API Key" Foreground="{StaticResource FgDisabled}"
                        FontSize="11" Margin="0,0,0,20"/>
             <!-- Teams -->
-            <TextBlock Text="Team ID + 显示名称" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <TextBlock Text="Team ID + 显示名称" Foreground="{StaticResource FgSecondary}" FontSize="12"/>
+                <Button Content="?" Margin="6,0,0,0"
+                        Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
+                        Foreground="{StaticResource FgSecondary}" Padding="6,1" FontSize="11"
+                        ToolTip="如何获取 Team ID？" Click="TeamIdHelp_Click"/>
+            </StackPanel>
             <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8">
                 <StackPanel>
                     <DataGrid x:Name="TeamsGrid" Background="{StaticResource BgTertiary}"
@@ -71,6 +77,10 @@
                     </Grid>
                 </StackPanel>
             </Border>
+            <TextBlock x:Name="TeamIdHint" Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,0,0,2"
+                       Text="Team ID 为纯数字，可从 Figma 团队页面 URL 中获取（如 figma.com/files/team/数字ID）" TextWrapping="Wrap"/>
+            <TextBlock x:Name="TeamIdError" Foreground="OrangeRed" FontSize="11" Margin="0,0,0,8"
+                       Visibility="Collapsed" TextWrapping="Wrap"/>
             <!-- Startup checkbox -->
             <CheckBox x:Name="StartupCheck" Content="开机自动启动"
                       Foreground="{StaticResource FgPrimary}" IsChecked="True" Margin="0,8,0,0"/>
