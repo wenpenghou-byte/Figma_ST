@@ -82,9 +82,18 @@ public partial class SearchWindow : Window
 
     private void OnSyncError(Exception ex)
     {
-        _syncErrorMessage = ex is FigmaAuthException
-            ? "同步失败：API Key 无效或已过期，请在设置中更新"
-            : $"同步失败：{ex.Message}";
+        if (ex is FigmaAuthException)
+        {
+            _syncErrorMessage = "同步失败：API Key 无效或已过期，请在设置中更新";
+        }
+        else if (ex.Message.Contains("404"))
+        {
+            _syncErrorMessage = $"同步失败：{ex.Message}\n请检查 Team ID 是否正确（应为纯数字，可从 Figma 团队页面 URL 中获取）";
+        }
+        else
+        {
+            _syncErrorMessage = $"同步失败：{ex.Message}";
+        }
         ShowSyncError(_syncErrorMessage);
     }
 
