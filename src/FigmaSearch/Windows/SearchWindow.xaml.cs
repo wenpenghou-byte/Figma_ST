@@ -2,31 +2,38 @@
 using FigmaSearch.Services;
 using FigmaSearch.ViewModels;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace FigmaSearch.Windows;
 
 public partial class SearchWindow : Window
 {
-     private readonly SearchViewModel _vm;
-      private UpdateInfo? _pendingUpdate;
-      private bool _hasBeenShown;
-      private string? _syncErrorMessage;
+    private readonly SearchViewModel _vm;
+    private UpdateInfo? _pendingUpdate;
+    private bool _hasBeenShown;
+    private string? _syncErrorMessage;
 
-      // ── AI mode (from v2-dev) ───────────────────────────────────
-      /// <summary>Whether the AI response area is currently shown (replaces search results).</summary>
-      private bool _isAiMode;
-      private CancellationTokenSource? _aiCts;
+    // ── AI mode ──────────────────────────────────────────────────
+    /// <summary>Whether the AI response area is currently shown (replaces search results).</summary>
+    private bool _isAiPending;
+    private bool _hasAiResult;
+    private CancellationTokenSource? _aiCts;
 
-      // ── Global mouse hook for outside-click detection (from main) ───
-      private IntPtr _mouseHookId;
-      private NativeMethods.LowLevelMouseProc? _mouseHookProc; // prevent GC
+    // ── Global mouse hook for outside-click detection ────────────
+    private IntPtr _mouseHookId;
+    private NativeMethods.LowLevelMouseProc? _mouseHookProc; // prevent GC
+
+    // ── AI loading dots animation ────────────────────────────────
+    private Storyboard? _dotsStoryboard;
 
     public SearchWindow()
     {
@@ -181,13 +188,22 @@ public partial class SearchWindow : Window
         // Or show progress if sync is running
         else if (App.AutoSync?.IsSyncing == true)
             ShowSyncProgress("正在同步文档…（视文档数量，可能需要几分钟到几十分钟，已拉取的文档可搜索）");
+
+        // Restore AI button state (pending → disabled "AI 工作中…")
+        SyncAiButtonState();
     }
 
     private void HideWindow()
     {
         UninstallMouseHook();
+        StopDotsAnimation();
         Hide();
-        ExitAiMode();
+        // Do NOT cancel AI request — let it finish in the background.
+        // Just reset the visual state so the next Show starts clean.
+        AiResultArea.Visibility = Visibility.Collapsed;
+        AiLoadingIndicator.Visibility = Visibility.Collapsed;
+        AiResponseScroll.Visibility = Visibility.Collapsed;
+        AiReadyBanner.Visibility = Visibility.Collapsed;
         SearchBox.Text = "";
         _vm.ClearSearch();
         RebuildResults();
@@ -264,6 +280,7 @@ public partial class SearchWindow : Window
                 if (!windowRect.Contains(clickPoint))
                 {
                     // Dispatch hide on UI thread (we're in the hook callback)
+                    // AI keeps running in background even when window hides.
                     Dispatcher.BeginInvoke(new Action(HideWindow));
                 }
             }
@@ -273,8 +290,6 @@ public partial class SearchWindow : Window
 
     private void SearchBox_TextChanged(object s, TextChangedEventArgs e)
     {
-        // Any text change exits AI mode and returns to normal search
-        if (_isAiMode) ExitAiMode();
         _vm.Query = SearchBox.Text;
         RebuildResults();
     }
@@ -282,7 +297,14 @@ public partial class SearchWindow : Window
     private void RebuildResults()
     {
         ResultsPanel.Children.Clear();
-        ResultsArea.Visibility = _vm.Results.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        var hasResults = _vm.Results.Count > 0;
+        ResultsArea.Visibility = hasResults ? Visibility.Visible : Visibility.Collapsed;
+        AiReadyBanner.Visibility = _hasAiResult && hasResults ? Visibility.Visible : Visibility.Collapsed;
+        // When search results appear, switch from AI panel to results panel
+        if (hasResults && AiResultArea.Visibility == Visibility.Visible && !_isAiPending)
+        {
+            AiResultArea.Visibility = Visibility.Collapsed;
+        }
         ResultsScroll.ScrollToTop();
         foreach (var group in _vm.Results)
         {
@@ -455,8 +477,10 @@ public partial class SearchWindow : Window
         if (!App.BrainMaker.IsConfigured)
         {
             EnterAiMode();
-            AiStatusLabel.Visibility = Visibility.Collapsed;
-            AiResponseText.Text = "AI 功能未配置。请在「设置 → AI 问答」中填写 Auth Account、Auth Key 和 User Corp。";
+            AiLoadingIndicator.Visibility = Visibility.Collapsed;
+            SetTextWithLinks(AiResponseText, "AI 功能未配置。请在「设置 → AI 问答」中填写 Auth Account、Auth Key 和 User Corp。");
+            AiResponseScroll.Visibility = Visibility.Visible;
+            MarkAiResultReady();
             return;
         }
 
@@ -465,65 +489,291 @@ public partial class SearchWindow : Window
         _aiCts = new CancellationTokenSource();
         var ct = _aiCts.Token;
 
+        _isAiPending = true;
+        _hasAiResult = false;
+        SyncAiButtonState();
+
         EnterAiMode();
-        AiStatusLabel.Visibility = Visibility.Visible;
-        AiStatusLabel.Text = "正在思考…";
-        AiResponseText.Text = "";
-        AskAiBtn.IsEnabled = false;
+        ShowAiLoading("AI 正在思考…");
 
         try
         {
             var response = await App.BrainMaker.ChatAsync(question, ct);
             if (ct.IsCancellationRequested) return;
-            AiStatusLabel.Visibility = Visibility.Collapsed;
-            AiResponseText.Text = response;
+            HideAiLoading();
+            SetTextWithLinks(AiResponseText, response);
+            AiResponseScroll.Visibility = Visibility.Visible;
+            MarkAiResultReady();
         }
         catch (OperationCanceledException)
         {
-            // User cancelled (typed new text, pressed Esc, etc.) — do nothing
+            // User cancelled — do nothing
         }
         catch (Exception ex)
         {
             if (ct.IsCancellationRequested) return;
-            AiStatusLabel.Visibility = Visibility.Collapsed;
-            AiResponseText.Text = $"请求失败：{ex.Message}";
+            HideAiLoading();
+            SetTextWithLinks(AiResponseText, $"请求失败：{ex.Message}");
+            AiResponseScroll.Visibility = Visibility.Visible;
+            MarkAiResultReady();
         }
         finally
         {
+            _isAiPending = false;
+            SyncAiButtonState();
+        }
+    }
+
+    /// <summary>
+    /// Sync the AI button text and enabled state to reflect pending / idle.
+    /// Safe to call at any time (ShowWindow, after AI completes, etc.).
+    /// </summary>
+    private void SyncAiButtonState()
+    {
+        if (_isAiPending)
+        {
+            AskAiBtn.Content = "AI 工作中…";
+            AskAiBtn.IsEnabled = false;
+        }
+        else
+        {
+            AskAiBtn.Content = "问 AI";
             AskAiBtn.IsEnabled = true;
         }
+        UpdateAiViewState();
     }
 
     private void EnterAiMode()
     {
-        _isAiMode = true;
-        ResultsArea.Visibility = Visibility.Collapsed;
         AiResultArea.Visibility = Visibility.Visible;
+        ResultsArea.Visibility = Visibility.Collapsed;
     }
 
+    /// <summary>
+    /// Fully cancel and reset AI state. Used when user explicitly dismisses AI
+    /// (e.g. pressing the ✕ button or Esc on the AI panel).
+    /// </summary>
     private void ExitAiMode()
     {
-        _isAiMode = false;
         _aiCts?.Cancel();
+        _isAiPending = false;
+        _hasAiResult = false;
+        StopDotsAnimation();
         AiResultArea.Visibility = Visibility.Collapsed;
-        AiStatusLabel.Visibility = Visibility.Collapsed;
-        AiResponseText.Text = "";
+        AiLoadingIndicator.Visibility = Visibility.Collapsed;
+        AiResponseScroll.Visibility = Visibility.Collapsed;
+        SetTextWithLinks(AiResponseText, string.Empty);
+        AiReadyBanner.Visibility = Visibility.Collapsed;
+        SyncAiButtonState();
     }
 
     private void Window_Deactivated(object s, EventArgs e)
     {
         if (!_hasBeenShown) return;
         if (App.IsSettingsOpen) return;
-        // Backup: also hide on deactivation (mouse hook is the primary mechanism)
+        // Allow outside-click to hide, even if AI is running (it keeps running in bg)
         if (IsVisible) HideWindow();
     }
     private void Window_KeyDown(object s, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape) HideWindow();
+        if (e.Key != Key.Escape) return;
+        // If AI panel is visible and has content, dismiss it first
+        if (AiResultArea.Visibility == Visibility.Visible)
+        {
+            if (_isAiPending)
+            {
+                // Esc during loading → cancel AI and return to search
+                ExitAiMode();
+            }
+            else if (_hasAiResult)
+            {
+                // Esc on result → dismiss result, return to search
+                DismissAiResult();
+            }
+            else
+            {
+                AiResultArea.Visibility = Visibility.Collapsed;
+            }
+            // If search box is empty after dismissing, hide the window
+            if (string.IsNullOrWhiteSpace(SearchBox.Text))
+                HideWindow();
+            return;
+        }
+        HideWindow();
     }
     private void ResultsScroll_PreviewMouseWheel(object s, System.Windows.Input.MouseWheelEventArgs e)
     {
         if (s is ScrollViewer sv) { sv.ScrollToVerticalOffset(sv.VerticalOffset - e.Delta / 3.0); e.Handled = true; }
+    }
+
+    private void AiDismissButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isAiPending)
+            ExitAiMode(); // cancel ongoing request
+        else
+            DismissAiResult();
+    }
+
+    private void AiReadyBanner_Click(object sender, RoutedEventArgs e)
+    {
+        ShowAiResult();
+    }
+
+    private void ShowAiResult()
+    {
+        AiResultArea.Visibility = Visibility.Visible;
+        AiLoadingIndicator.Visibility = Visibility.Collapsed;
+        AiResponseScroll.Visibility = Visibility.Visible;
+        ResultsArea.Visibility = Visibility.Collapsed;
+        AiReadyBanner.Visibility = Visibility.Collapsed;
+    }
+
+    private void DismissAiResult()
+    {
+        _hasAiResult = false;
+        AiResultArea.Visibility = Visibility.Collapsed;
+        AiResponseScroll.Visibility = Visibility.Collapsed;
+        UpdateAiViewState();
+    }
+
+    private void MarkAiResultReady()
+    {
+        _isAiPending = false;
+        _hasAiResult = true;
+        SyncAiButtonState();
+        // If window is currently visible, update the view to show the result
+        if (IsVisible)
+            UpdateAiViewState();
+    }
+
+    private void UpdateAiViewState()
+    {
+        var hasResults = _vm.Results.Count > 0;
+
+        // If the AI panel is actively being shown (user is viewing AI), keep it
+        if (AiResultArea.Visibility == Visibility.Visible)
+        {
+            ResultsArea.Visibility = Visibility.Collapsed;
+            AiReadyBanner.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (hasResults)
+        {
+            ResultsArea.Visibility = Visibility.Visible;
+            AiResultArea.Visibility = Visibility.Collapsed;
+            AiReadyBanner.Visibility = _hasAiResult ? Visibility.Visible : Visibility.Collapsed;
+        }
+        else
+        {
+            ResultsArea.Visibility = Visibility.Collapsed;
+            AiReadyBanner.Visibility = Visibility.Collapsed;
+            AiResultArea.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    // ── AI loading animation ─────────────────────────────────────
+
+    private void ShowAiLoading(string statusText)
+    {
+        AiStatusLabel.Text = statusText;
+        AiLoadingIndicator.Visibility = Visibility.Visible;
+        AiResponseScroll.Visibility = Visibility.Collapsed;
+        StartDotsAnimation();
+    }
+
+    private void HideAiLoading()
+    {
+        StopDotsAnimation();
+        AiLoadingIndicator.Visibility = Visibility.Collapsed;
+    }
+
+    private void StartDotsAnimation()
+    {
+        StopDotsAnimation();
+
+        _dotsStoryboard = new Storyboard { RepeatBehavior = RepeatBehavior.Forever };
+
+        // Three dots pulse in sequence: each fades 0.3→1→0.3 over 0.4s,
+        // staggered by 0.2s to create a wave effect.
+        var targets = new[] { Dot1, Dot2, Dot3 };
+        for (int i = 0; i < targets.Length; i++)
+        {
+            var anim = new DoubleAnimationUsingKeyFrames
+            {
+                BeginTime = TimeSpan.FromMilliseconds(i * 200)
+            };
+            anim.KeyFrames.Add(new LinearDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            anim.KeyFrames.Add(new LinearDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(200))));
+            anim.KeyFrames.Add(new LinearDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(400))));
+            anim.KeyFrames.Add(new LinearDoubleKeyFrame(0.3, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(600))));
+            Storyboard.SetTarget(anim, targets[i]);
+            Storyboard.SetTargetProperty(anim, new PropertyPath(OpacityProperty));
+            _dotsStoryboard.Children.Add(anim);
+        }
+
+        _dotsStoryboard.Begin(this, true);
+    }
+
+    private void StopDotsAnimation()
+    {
+        if (_dotsStoryboard != null)
+        {
+            _dotsStoryboard.Stop(this);
+            _dotsStoryboard = null;
+        }
+        Dot1.Opacity = 0.3;
+        Dot2.Opacity = 0.3;
+        Dot3.Opacity = 0.3;
+    }
+
+    private static void SetTextWithLinks(TextBlock tb, string text)
+    {
+        tb.Inlines.Clear();
+        if (string.IsNullOrEmpty(text)) return;
+
+        var regex = new Regex("https?://\\S+", RegexOptions.Compiled);
+        var lastIndex = 0;
+        foreach (Match match in regex.Matches(text))
+        {
+            if (match.Index > lastIndex)
+            {
+                tb.Inlines.Add(new Run(text.Substring(lastIndex, match.Index - lastIndex)));
+            }
+
+            var rawMatch = match.Value;
+            var url = rawMatch.TrimEnd(',', '.', ';', ')', ']', '}', '"', '\'');
+            var hyperlink = new Hyperlink(new Run(url))
+            {
+                NavigateUri = new Uri(url),
+                Style = (Style)tb.FindResource("AiHyperlinkStyle")
+            };
+            hyperlink.RequestNavigate += (_, _) => OpenExternalUrl(url);
+            tb.Inlines.Add(hyperlink);
+            var trailing = rawMatch.Substring(url.Length);
+            if (!string.IsNullOrEmpty(trailing))
+            {
+                tb.Inlines.Add(new Run(trailing));
+            }
+            lastIndex = match.Index + match.Length;
+        }
+
+        if (lastIndex < text.Length)
+        {
+            tb.Inlines.Add(new Run(text.Substring(lastIndex)));
+        }
+    }
+
+    private static void OpenExternalUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+        }
     }
 
     // ── Win32 P/Invoke ─────────────────────────────────────────────

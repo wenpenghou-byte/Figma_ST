@@ -94,6 +94,7 @@ public class AutoSyncService : IDisposable
                 teams,
                 settings.FigmaApiKey,
                 progress,
+                hasPages:          (fileKey) => _db.HasPages(fileKey),
                 onFileSynced:      (doc, pages) => _db.UpsertFileData(doc, pages),
                 onTeamFinished:    (teamId, currentKeys) =>
                 {

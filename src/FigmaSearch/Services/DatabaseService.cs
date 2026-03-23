@@ -265,6 +265,14 @@ public class DatabaseService : IDisposable
         return Conn().Query<FigmaPage>($"SELECT id Id, document_key DocumentKey, name Name, url Url FROM Pages WHERE id IN ({inList})").ToList();
     }
 
+    /// <summary>
+    /// Returns true if the given file has at least one page in the DB.
+    /// Used during sync to detect files whose page-fetch previously failed,
+    /// so they can be force-retried on the next sync.
+    /// </summary>
+    public bool HasPages(string fileKey) =>
+        Conn().ExecuteScalar<int>("SELECT COUNT(*) FROM Pages WHERE document_key=@key", new { key = fileKey }) > 0;
+
     public int GetDocumentCount() => Conn().ExecuteScalar<int>("SELECT COUNT(*) FROM Documents");
     public int GetPageCount()     => Conn().ExecuteScalar<int>("SELECT COUNT(*) FROM Pages");
     public DateTime? GetLastSyncTime() { var v = GetSetting("last_sync_time"); return DateTime.TryParse(v, out var dt) ? dt : null; }

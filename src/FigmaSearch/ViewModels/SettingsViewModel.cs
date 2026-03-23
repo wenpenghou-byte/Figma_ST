@@ -64,6 +64,11 @@ public class SettingsViewModel : INotifyPropertyChanged
         get => _settings.BmProject;
         set { _settings.BmProject = value; OnPropertyChanged(); }
     }
+    public string BmDocset
+    {
+        get => _settings.BmDocset;
+        set { _settings.BmDocset = value; OnPropertyChanged(); }
+    }
 
     public SettingsViewModel(DatabaseService db)
     {

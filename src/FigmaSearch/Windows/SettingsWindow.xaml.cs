@@ -24,23 +24,25 @@ public partial class SettingsWindow : Window
         IntervalSlider.Value = _vm.UpdateIntervalHours;
         IntervalLabel.Text = $"{_vm.UpdateIntervalHours} 小时";
         StartupCheck.IsChecked = _vm.LaunchAtStartup;
-         HotkeyBox.Text = FormatConfigForDisplay(_vm.HotkeyConfig);
-         // Set theme combo selection without triggering the change handler
-         ThemeCombo.SelectionChanged -= ThemeCombo_Changed;
-         ThemeCombo.SelectedIndex = _vm.Theme == "Light" ? 1 : 0;
-         ThemeCombo.SelectionChanged += ThemeCombo_Changed;
-         VersionLabel.Text = $"当前版本：{UpdateService.CurrentVersion()}";
-         UpdateDbStats();
+        HotkeyBox.Text = FormatConfigForDisplay(_vm.HotkeyConfig);
+        // Set theme combo selection without triggering the change handler
+        ThemeCombo.SelectionChanged -= ThemeCombo_Changed;
+        ThemeCombo.SelectedIndex = _vm.Theme == "Light" ? 1 : 0;
+        ThemeCombo.SelectionChanged += ThemeCombo_Changed;
+        VersionLabel.Text = $"当前版本：{UpdateService.CurrentVersion()}";
+        UpdateDbStats();
 
-         // BrainMaker AI fields
-         BmAuthAccountBox.Text = _vm.BmAuthAccount;
-         BmAuthKeyBox.Password = _vm.BmAuthKey;
-         BmUserCorpBox.Text = _vm.BmUserCorp;
+        // BrainMaker AI fields
+        BmAuthAccountBox.Text = _vm.BmAuthAccount;
+        BmAuthKeyBox.Password = _vm.BmAuthKey;
+        BmUserCorpBox.Text = _vm.BmUserCorp;
+        BmProjectBox.Text = _vm.BmProject;
+        BmDocsetBox.Text = _vm.BmDocset;
 
-         // If there's already a pending update, show install button immediately
-         if (App.PendingUpdate != null)
-             ShowInstallButton($"发现新版本 v{App.PendingUpdate.LatestVersion}");
-     }
+        // If there's already a pending update, show install button immediately
+        if (App.PendingUpdate != null)
+            ShowInstallButton($"发现新版本 v{App.PendingUpdate.LatestVersion}");
+    }
 
     private void UpdateDbStats()
     {
@@ -351,6 +353,8 @@ public partial class SettingsWindow : Window
         _vm.BmAuthAccount = BmAuthAccountBox.Text.Trim();
         _vm.BmAuthKey = BmAuthKeyBox.Password;
         _vm.BmUserCorp = BmUserCorpBox.Text.Trim();
+        _vm.BmProject = BmProjectBox.Text.Trim();
+        _vm.BmDocset = BmDocsetBox.Text.Trim();
 
         _vm.Save();
 
@@ -358,7 +362,7 @@ public partial class SettingsWindow : Window
         App.Hotkey?.ApplyConfig(_vm.HotkeyConfig);
 
         // Reconfigure BrainMaker service with new credentials
-        App.BrainMaker?.Configure(_vm.BmAuthAccount, _vm.BmAuthKey, _vm.BmUserCorp, _vm.BmProject);
+        App.BrainMaker?.Configure(_vm.BmAuthAccount, _vm.BmAuthKey, _vm.BmUserCorp, _vm.BmProject, _vm.BmDocset);
 
         // Only trigger sync when teams were ADDED (new data to fetch).
         // Removing teams just deletes local data (handled by SaveTeams) — no sync needed.

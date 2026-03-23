@@ -174,8 +174,26 @@
                         <TextBox x:Name="BmUserCorpBox" Grid.Column="1"
                                  Style="{StaticResource SearchBox}" FontSize="13"/>
                     </Grid>
-                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,2,0,0"
+                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,2,0,8"
                                Text="User Corp 为邮箱前缀，如 houwenpeng"/>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/><ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Project" Foreground="{StaticResource FgPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                        <TextBox x:Name="BmProjectBox" Grid.Column="1"
+                                 Style="{StaticResource SearchBox}" FontSize="13"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/><ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Docset" Foreground="{StaticResource FgPrimary}" FontSize="12" VerticalAlignment="Center"/>
+                        <TextBox x:Name="BmDocsetBox" Grid.Column="1"
+                                 Style="{StaticResource SearchBox}" FontSize="13"/>
+                    </Grid>
+                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,2,0,0"
+                               Text="Project 和 Docset 为 BrainMaker 空间标识，默认无需修改"/>
                 </StackPanel>
                 <!-- Check for updates -->
                 <StackPanel Margin="0,0,0,16">

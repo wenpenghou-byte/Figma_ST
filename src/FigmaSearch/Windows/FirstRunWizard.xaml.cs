@@ -68,34 +68,66 @@ public partial class FirstRunWizard : Window
     private void Start_Click(object s, RoutedEventArgs e)
     {
         var key = ApiKeyBox.Password.Trim();
-        if (string.IsNullOrEmpty(key))
-        {
-            ApiKeyHint.Text = "请先填入 API Key";
-            ApiKeyHint.Foreground = System.Windows.Media.Brushes.OrangeRed;
-            return;
-        }
-        if (_teams.Count == 0)
-        {
-            SyncStatus.Visibility = Visibility.Visible;
-            SyncStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
-            SyncStatus.Text = "请至少添加一个 Team ID，否则无法搜索文档";
-            return;
-        }
+        var hasKey = !string.IsNullOrEmpty(key);
+        var hasTeams = _teams.Count > 0;
 
-        // Save config and mark first-run complete
+        // Save config and mark first-run complete (even if incomplete)
         var settings = App.DB.LoadSettings();
         settings.FigmaApiKey     = key;
         settings.LaunchAtStartup = StartupCheck.IsChecked == true;
         settings.IsFirstRun      = false;
         App.DB.SaveSettings(settings);
-        App.DB.SaveTeams(_teams);
+        if (hasTeams) App.DB.SaveTeams(_teams);
         StartupManager.Set(settings.LaunchAtStartup);
 
-        MessageBox.Show(
-            "配置完成！文档数据正在后台同步中。\n\n双击左 Alt 可唤醒搜索框，已完成同步的文档可立即搜索。",
-            "开始使用",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
+        if (!hasKey || !hasTeams)
+        {
+            // Build a specific message about what's missing
+            var missing = new System.Collections.Generic.List<string>();
+            if (!hasKey) missing.Add("Figma API Key");
+            if (!hasTeams) missing.Add("Team ID");
+
+            var msgBox = new Window
+            {
+                Title = "提示",
+                Width = 420, Height = 200,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStyle = WindowStyle.SingleBorderWindow,
+                Background = (System.Windows.Media.Brush)FindResource("BgPrimary")
+            };
+            var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(24, 20, 24, 20) };
+            panel.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = $"您尚未配置 {string.Join(" 和 ", missing)}，Figma 文档搜索功能暂时无法使用。\n\n请前往「设置」中补全配置后即可正常搜索。",
+                Foreground = System.Windows.Media.Brushes.OrangeRed,
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 20)
+            });
+            var okBtn = new System.Windows.Controls.Button
+            {
+                Content = "我知道了",
+                Style = (Style)FindResource("FlatButton"),
+                Background = (System.Windows.Media.Brush)FindResource("AccentBlue"),
+                Foreground = System.Windows.Media.Brushes.White,
+                Padding = new Thickness(20, 8, 20, 8),
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            okBtn.Click += (_, _) => msgBox.Close();
+            panel.Children.Add(okBtn);
+            msgBox.Content = panel;
+            msgBox.ShowDialog();
+        }
+        else
+        {
+            MessageBox.Show(
+                "配置完成！文档数据正在后台同步中。\n\n双击左 Alt 可唤醒搜索框，已完成同步的文档可立即搜索。",
+                "开始使用",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
 
         // Close immediately — sync will happen in background via AutoSyncService
         Close();

@@ -7,16 +7,16 @@ namespace FigmaSearch;
 
 public partial class App : Application
 {
-     public static DatabaseService    DB { get; private set; } = null!;
-     public static FigmaApiService    Api { get; private set; } = null!;
-     public static UpdateService      Updater { get; private set; } = null!;
-     public static AutoSyncService    AutoSync { get; private set; } = null!;
-     public static HotkeyService      Hotkey { get; private set; } = null!;
-     public static BrainMakerService  BrainMaker { get; private set; } = null!;
-     public static SearchWindow       SearchWin { get; private set; } = null!;
+    public static DatabaseService    DB { get; private set; } = null!;
+    public static FigmaApiService    Api { get; private set; } = null!;
+    public static UpdateService      Updater { get; private set; } = null!;
+    public static AutoSyncService    AutoSync { get; private set; } = null!;
+    public static HotkeyService      Hotkey { get; private set; } = null!;
+    public static BrainMakerService  BrainMaker { get; private set; } = null!;
+    public static SearchWindow       SearchWin { get; private set; } = null!;
 
-     /// <summary>Global pending update info, shared between SearchWindow and SettingsWindow.</summary>
-     public static UpdateInfo? PendingUpdate { get; set; }
+    /// <summary>Global pending update info, shared between SearchWindow and SettingsWindow.</summary>
+    public static UpdateInfo? PendingUpdate { get; set; }
     private TaskbarIcon? _trayIcon;
     // Keep mutex alive for the process lifetime to prevent second instance
     private static System.Threading.Mutex? _instanceMutex;
@@ -46,7 +46,7 @@ public partial class App : Application
         ApplyTheme(settings.Theme, persist: false);
 
         // Configure BrainMaker AI with saved credentials
-        BrainMaker.Configure(settings.BmAuthAccount, settings.BmAuthKey, settings.BmUserCorp, settings.BmProject);
+        BrainMaker.Configure(settings.BmAuthAccount, settings.BmAuthKey, settings.BmUserCorp, settings.BmProject, settings.BmDocset);
 
         // First run: show wizard
         if (settings.IsFirstRun)
@@ -54,8 +54,8 @@ public partial class App : Application
             var wizard = new FirstRunWizard();
             wizard.ShowDialog();
             settings = DB.LoadSettings();
-            // Exit if user closed wizard without completing setup
-            if (string.IsNullOrEmpty(settings.FigmaApiKey) || DB.GetTeams().Count == 0)
+            // If user closed wizard via "退出" without completing, exit app
+            if (settings.IsFirstRun)
             {
                 Shutdown();
                 return;

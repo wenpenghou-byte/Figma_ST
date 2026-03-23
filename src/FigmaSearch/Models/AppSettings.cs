@@ -17,4 +17,5 @@ public class AppSettings
     public string BmAuthKey { get; set; } = string.Empty;
     public string BmUserCorp { get; set; } = string.Empty;
     public string BmProject { get; set; } = "space_houwenpeng";
+    public string BmDocset { get; set; } = "docset_houwenpeng";
 }
