@@ -289,6 +289,16 @@ public partial class SearchWindow : Window
             foreach (var item in group.Items)
                 ResultsPanel.Children.Add(BuildDocRow(item));
         }
+        // Show result count when there are many results
+        if (_vm.TotalDocCount > 5)
+        {
+            ResultCountBar.Visibility = Visibility.Visible;
+            ResultCountText.Text = $"共 {_vm.TotalDocCount} 个文档匹配";
+        }
+        else
+        {
+            ResultCountBar.Visibility = Visibility.Collapsed;
+        }
     }
 
     private UIElement BuildDocRow(SearchResultItem item)

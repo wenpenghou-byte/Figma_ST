@@ -56,11 +56,23 @@
             </Border>
             <!-- Results -->
             <Border x:Name="ResultsArea" Grid.Row="2" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0" Visibility="Collapsed">
-                <ScrollViewer x:Name="ResultsScroll" MaxHeight="520"
-                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                              PreviewMouseWheel="ResultsScroll_PreviewMouseWheel">
-                    <StackPanel x:Name="ResultsPanel" Margin="0,6,0,8"/>
-                </ScrollViewer>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ScrollViewer x:Name="ResultsScroll" Grid.Row="0" MaxHeight="520"
+                                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  PreviewMouseWheel="ResultsScroll_PreviewMouseWheel">
+                        <StackPanel x:Name="ResultsPanel" Margin="0,6,0,8"/>
+                    </ScrollViewer>
+                    <!-- Result count hint -->
+                    <Border x:Name="ResultCountBar" Grid.Row="1" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0"
+                            Padding="14,5" Visibility="Collapsed">
+                        <TextBlock x:Name="ResultCountText" HorizontalAlignment="Center"
+                                   FontSize="11" Foreground="{DynamicResource FgSecondary}"/>
+                    </Border>
+                </Grid>
             </Border>
             <!-- Sync status bar (progress / error) -->
             <Border x:Name="SyncStatusBar" Grid.Row="3" Visibility="Collapsed" Padding="14,6">

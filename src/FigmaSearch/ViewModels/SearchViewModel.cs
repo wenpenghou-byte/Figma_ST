@@ -16,6 +16,9 @@ public class SearchViewModel : INotifyPropertyChanged
 
     public ObservableCollection<SearchResultGroup> Results { get; } = new();
 
+    /// <summary>Total number of matched documents in the last search.</summary>
+    public int TotalDocCount { get; private set; }
+
     public string Query
     {
         get => _query;
@@ -34,6 +37,7 @@ public class SearchViewModel : INotifyPropertyChanged
     private void DoSearch()
     {
         Results.Clear();
+        TotalDocCount = 0;
         if (string.IsNullOrWhiteSpace(_query)) return;
 
         var (docKeys, compositePageIds) = _db.SearchRaw(_query);
@@ -61,17 +65,16 @@ public class SearchViewModel : INotifyPropertyChanged
         // Build a set of matched composite page IDs for highlight detection
         var matchedPageSet = compositePageIds;
 
-        int totalCount = 0;
+        int totalDocs = 0;
         foreach (var tg in teams)
         {
-            if (totalCount >= 16) break;
             var group = new SearchResultGroup
             {
                 TeamId          = tg.Key,
                 TeamDisplayName = GetTeamDisplayName(tg.Key)
             };
 
-            foreach (var doc in tg.Take(16 - totalCount))
+            foreach (var doc in tg)
             {
                 var item = new SearchResultItem
                 {
@@ -102,12 +105,14 @@ public class SearchViewModel : INotifyPropertyChanged
                 }
 
                 group.Items.Add(item);
-                totalCount++;
+                totalDocs++;
             }
 
             if (group.Items.Count > 0)
                 Results.Add(group);
         }
+
+        TotalDocCount = totalDocs;
     }
 
     private readonly Dictionary<string, string> _teamNameCache = new();
