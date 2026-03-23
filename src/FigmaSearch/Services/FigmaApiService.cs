@@ -108,6 +108,7 @@ public class FigmaApiService
         List<TeamConfig> teams,
         string token,
         IProgress<SyncProgress> progress,
+        Func<string, bool>? hasPages = null,
         Action<FigmaFile, List<FigmaPage>?>? onFileSynced = null,
         Action<string, HashSet<string>>? onTeamFinished = null,
         CancellationToken ct = default)
@@ -128,7 +129,8 @@ public class FigmaApiService
             });
 
             var teamFileKeys = new HashSet<string>(); // tracks all file keys seen for this team
-            int syncedFiles = 0, failedFiles = 0;
+            int syncedFiles = 0;
+            var failedFileNames = new List<string>(); // collect failed file names for user visibility
             bool teamFullyCompleted = true; // tracks whether ALL files in this team were processed
 
             var teamUrl = $"{BASE}/teams/{team.TeamId}/projects";
@@ -218,34 +220,52 @@ public class FigmaApiService
                         FigmaLastModified = lastModified
                     };
 
+                    // Fetch pages with retry (up to 3 attempts with exponential back-off).
+                    // Also force retry for files that exist in DB but have zero pages
+                    // (leftover from a previous sync where page-fetch silently failed).
                     var filePages = new List<FigmaPage>();
                     bool pagesFetchOk = false;
-                    try
+                    bool dbHasPages = hasPages?.Invoke(fileKey) ?? true;
+                    const int maxPageAttempts = 3;
+
+                    for (int attempt = 1; attempt <= maxPageAttempts && !pagesFetchOk; attempt++)
                     {
-                        // throwOnForbidden:false — some files may not be accessible; skip instead of aborting
-                        // Do NOT pass ct here — once we started a file, let it finish
-                        var detail   = await GetAsync($"{BASE}/files/{fileKey}?depth=1", token, throwOnForbidden: false);
-                        var children = detail.GetProperty("document").GetProperty("children").EnumerateArray();
-                        foreach (var page in children)
+                        try
                         {
-                            var pageId   = page.GetProperty("id").GetString() ?? "";
-                            var pageName = page.GetProperty("name").GetString() ?? "";
-                            var nodeId   = pageId.Replace(":", "%3A");
-                            filePages.Add(new FigmaPage
+                            // throwOnForbidden:false — some files may not be accessible; skip instead of aborting
+                            // Do NOT pass ct here — once we started a file, let it finish
+                            var detail   = await GetAsync($"{BASE}/files/{fileKey}?depth=1", token, throwOnForbidden: false);
+                            var children = detail.GetProperty("document").GetProperty("children").EnumerateArray();
+                            filePages.Clear();
+                            foreach (var page in children)
                             {
-                                Id          = pageId,
-                                DocumentKey = fileKey,
-                                Name        = pageName,
-                                Url         = $"{fileUrl}?node-id={nodeId}"
-                            });
+                                var pageId   = page.GetProperty("id").GetString() ?? "";
+                                var pageName = page.GetProperty("name").GetString() ?? "";
+                                var nodeId   = pageId.Replace(":", "%3A");
+                                filePages.Add(new FigmaPage
+                                {
+                                    Id          = pageId,
+                                    DocumentKey = fileKey,
+                                    Name        = pageName,
+                                    Url         = $"{fileUrl}?node-id={nodeId}"
+                                });
+                            }
+                            pagesFetchOk = true;
                         }
-                        pagesFetchOk = true;
-                    }
-                    catch (Exception ex) when (ex is not FigmaAuthException)
-                    {
-                        // Could not fetch pages (e.g. 403 view-only, network error).
-                        failedFiles++;
-                        System.Diagnostics.Debug.WriteLine($"[FigmaApi] Failed to fetch pages for {fileName} ({fileKey}): {ex.Message}");
+                        catch (Exception ex) when (ex is not FigmaAuthException)
+                        {
+                            System.Diagnostics.Debug.WriteLine(
+                                $"[FigmaApi] Attempt {attempt}/{maxPageAttempts} failed to fetch pages for {fileName} ({fileKey}): {ex.Message}");
+                            if (attempt < maxPageAttempts)
+                            {
+                                // Exponential back-off: 2s, 4s
+                                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
+                            }
+                            else
+                            {
+                                failedFileNames.Add(fileName);
+                            }
+                        }
                     }
 
                     // Always persist the document metadata (name, URL) so it's searchable.
@@ -253,6 +273,20 @@ public class FigmaApiService
                     // keep whatever pages are already in the DB.
                     onFileSynced?.Invoke(doc, pagesFetchOk ? filePages : null);
                     syncedFiles++;
+
+                    // Warn about files whose pages were never successfully fetched
+                    // (neither now nor in a previous sync)
+                    if (!pagesFetchOk && !dbHasPages)
+                    {
+                        progress.Report(new SyncProgress
+                        {
+                            Phase    = "页面获取失败",
+                            TeamName = team.DisplayName,
+                            Current  = fi + 1,
+                            Total    = files.Count,
+                            Detail   = $"「{fileName}」页面获取失败（已重试 {maxPageAttempts} 次）"
+                        });
+                    }
 
                     // Rate limit delay — do NOT pass ct (let the write complete cleanly)
                     try { await Task.Delay(200, ct); }
@@ -268,9 +302,17 @@ public class FigmaApiService
                 onTeamFinished?.Invoke(team.TeamId, teamFileKeys);
             }
 
-            var detail2 = failedFiles > 0
-                ? $"同步 {syncedFiles} 个文件，{failedFiles} 个文件获取失败（已保留旧数据）"
-                : $"同步 {syncedFiles} 个文件";
+            string detail2;
+            if (failedFileNames.Count > 0)
+            {
+                var names = string.Join("、", failedFileNames.Take(5));
+                var suffix = failedFileNames.Count > 5 ? $" 等 {failedFileNames.Count} 个文件" : "";
+                detail2 = $"同步 {syncedFiles} 个文件，{failedFileNames.Count} 个获取失败：{names}{suffix}";
+            }
+            else
+            {
+                detail2 = $"同步 {syncedFiles} 个文件";
+            }
             progress.Report(new SyncProgress
             {
                 Phase    = teamFullyCompleted ? $"已完成 {team.DisplayName}" : $"已中断 {team.DisplayName}",
