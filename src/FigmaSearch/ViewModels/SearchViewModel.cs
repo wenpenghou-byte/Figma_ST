@@ -36,11 +36,11 @@ public class SearchViewModel : INotifyPropertyChanged
         Results.Clear();
         if (string.IsNullOrWhiteSpace(_query)) return;
 
-        var (docKeys, pageIds) = _db.SearchRaw(_query);
-        if (docKeys.Count == 0 && pageIds.Count == 0) return;
+        var (docKeys, compositePageIds) = _db.SearchRaw(_query);
+        if (docKeys.Count == 0 && compositePageIds.Count == 0) return;
 
         // Collect docs that are parents of matched pages
-        var pages = _db.GetPagesByIds(pageIds);
+        var pages = _db.GetPagesByCompositeIds(compositePageIds);
         var parentDocKeys = pages.Select(p => p.DocumentKey).ToHashSet();
 
         // All doc keys to fetch
@@ -57,6 +57,9 @@ public class SearchViewModel : INotifyPropertyChanged
             .GroupBy(d => d.TeamId)
             .OrderBy(g => teamOrder.TryGetValue(g.Key, out var idx) ? idx : int.MaxValue)
             .ToList();
+
+        // Build a set of matched composite page IDs for highlight detection
+        var matchedPageSet = compositePageIds;
 
         int totalCount = 0;
         foreach (var tg in teams)
@@ -94,7 +97,7 @@ public class SearchViewModel : INotifyPropertyChanged
                         PageId           = page.Id,
                         PageName         = page.Name,
                         PageUrl          = page.Url,
-                        IsPageNameMatched= pageIds.Contains(page.Id)
+                        IsPageNameMatched= matchedPageSet.Contains($"{doc.Key}:{page.Id}")
                     });
                 }
 

@@ -29,15 +29,65 @@ public class DatabaseService : IDisposable
     }
     private void Init()
     {
-        Conn().Execute(@"
+        var c = Conn();
+        c.Execute(@"
             CREATE TABLE IF NOT EXISTS Settings (key TEXT PRIMARY KEY, value TEXT);
             CREATE TABLE IF NOT EXISTS Teams (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, sort_order INTEGER DEFAULT 0);
             CREATE TABLE IF NOT EXISTS Documents (key TEXT PRIMARY KEY, project_id TEXT, project_name TEXT, team_id TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL, last_synced TEXT, figma_last_modified TEXT);
-            CREATE TABLE IF NOT EXISTS Pages (id TEXT PRIMARY KEY, document_key TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL);
             CREATE VIRTUAL TABLE IF NOT EXISTS SearchIndex USING fts5(entity_type, entity_id, display_name, team_id, document_key);
         ");
         // Migrate: add figma_last_modified column to existing databases that don't have it
-        try { Conn().Execute("ALTER TABLE Documents ADD COLUMN figma_last_modified TEXT"); } catch { /* column already exists */ }
+        try { c.Execute("ALTER TABLE Documents ADD COLUMN figma_last_modified TEXT"); } catch { /* column already exists */ }
+
+        // Migrate: Pages table — old schema used `id TEXT PRIMARY KEY` which caused
+        // cross-file collisions (Figma page ids like "0:1" are only unique within a file).
+        // New schema uses composite PK (id, document_key) so pages from different files
+        // never overwrite each other.
+        MigratePagesPrimaryKey(c);
+    }
+
+    /// <summary>
+    /// Detects the old Pages schema (id TEXT PRIMARY KEY) and recreates the table
+    /// with a composite PK (id, document_key). Preserves all existing data.
+    /// Safe to call repeatedly — no-ops if migration is already done.
+    /// </summary>
+    private static void MigratePagesPrimaryKey(SqliteConnection c)
+    {
+        // Check if Pages table exists at all
+        var tableExists = c.ExecuteScalar<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Pages'") > 0;
+
+        if (!tableExists)
+        {
+            // Fresh install — create with correct schema directly
+            c.Execute(@"CREATE TABLE Pages (
+                id TEXT NOT NULL, document_key TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL,
+                PRIMARY KEY (id, document_key))");
+            return;
+        }
+
+        // Check current PK structure via table_info
+        // If the table has a single PK column (id), we need to migrate.
+        // After migration, both id and document_key will be PK columns.
+        var pkCols = c.Query<(string name, int pk)>(
+            "SELECT name, pk FROM pragma_table_info('Pages') WHERE pk > 0").ToList();
+
+        if (pkCols.Count == 1 && pkCols[0].name == "id")
+        {
+            // Old schema detected — migrate
+            using var tx = c.BeginTransaction();
+            c.Execute("ALTER TABLE Pages RENAME TO Pages_old", transaction: tx);
+            c.Execute(@"CREATE TABLE Pages (
+                id TEXT NOT NULL, document_key TEXT NOT NULL, name TEXT NOT NULL, url TEXT NOT NULL,
+                PRIMARY KEY (id, document_key))", transaction: tx);
+            // Copy data — if there were duplicates from the old bug, keep the one
+            // with the correct document_key (INSERT OR IGNORE skips true duplicates)
+            c.Execute(@"INSERT OR IGNORE INTO Pages (id, document_key, name, url)
+                        SELECT id, document_key, name, url FROM Pages_old", transaction: tx);
+            c.Execute("DROP TABLE Pages_old", transaction: tx);
+            tx.Commit();
+        }
+        // else: already migrated or correct schema — no-op
     }
 
     public string? GetSetting(string key) =>
@@ -130,8 +180,8 @@ public class DatabaseService : IDisposable
         foreach (var p in pages)
         {
             c.Execute("INSERT OR REPLACE INTO Pages(id,document_key,name,url) VALUES(@Id,@DocumentKey,@Name,@Url)", p, tx);
-            c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('page',@id,@name,@teamId,@docKey)",
-                new { id = p.Id, name = p.Name, teamId, docKey = p.DocumentKey }, tx);
+            c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('page',@compositeId,@name,@teamId,@docKey)",
+                new { compositeId = $"{p.DocumentKey}:{p.Id}", name = p.Name, teamId, docKey = p.DocumentKey }, tx);
         }
         tx.Commit();
         SetLastSyncTime(DateTime.UtcNow);
@@ -174,8 +224,8 @@ public class DatabaseService : IDisposable
             foreach (var p in pages)
             {
                 c.Execute("INSERT OR REPLACE INTO Pages(id,document_key,name,url) VALUES(@Id,@DocumentKey,@Name,@Url)", p, tx);
-                c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('page',@id,@name,@teamId,@docKey)",
-                    new { id = p.Id, name = p.Name, teamId = doc.TeamId, docKey = doc.Key }, tx);
+                c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('page',@compositeId,@name,@teamId,@docKey)",
+                    new { compositeId = $"{doc.Key}:{p.Id}", name = p.Name, teamId = doc.TeamId, docKey = doc.Key }, tx);
             }
         }
 
@@ -210,13 +260,13 @@ public class DatabaseService : IDisposable
         c.Execute($"DELETE FROM SearchIndex WHERE entity_type='document' AND entity_id IN ({inList})", transaction: tx);
         tx.Commit();
     }
-    public (HashSet<string> docKeys, HashSet<string> pageIds) SearchRaw(string keyword)
+    public (HashSet<string> docKeys, HashSet<string> compositePageIds) SearchRaw(string keyword)
     {
         if (string.IsNullOrWhiteSpace(keyword)) return (new(), new());
         var c = Conn();
 
         var docKeys = new HashSet<string>();
-        var pageIds = new HashSet<string>();
+        var compositePageIds = new HashSet<string>(); // "docKey:pageId" format for global uniqueness
 
         // Strategy 1: FTS5 prefix match (fast, handles ASCII/pinyin well)
         try
@@ -228,7 +278,7 @@ public class DatabaseService : IDisposable
             foreach (var h in hits)
             {
                 if (h.entity_type == "document") docKeys.Add(h.entity_id);
-                else if (h.entity_type == "page") pageIds.Add(h.entity_id);
+                else if (h.entity_type == "page") compositePageIds.Add(h.entity_id); // already "docKey:pageId"
             }
         }
         catch { /* FTS query failed — rely on LIKE below */ }
@@ -237,10 +287,12 @@ public class DatabaseService : IDisposable
         var pat = $"%{keyword}%";
         foreach (var k in c.Query<string>("SELECT key FROM Documents WHERE name LIKE @pat", new { pat }))
             docKeys.Add(k);
-        foreach (var id in c.Query<string>("SELECT id FROM Pages WHERE name LIKE @pat", new { pat }))
-            pageIds.Add(id);
+        // Pages LIKE query returns (id, document_key) — build composite ids
+        foreach (var p in c.Query<(string id, string document_key)>(
+            "SELECT id, document_key FROM Pages WHERE name LIKE @pat", new { pat }))
+            compositePageIds.Add($"{p.document_key}:{p.id}");
 
-        return (docKeys, pageIds);
+        return (docKeys, compositePageIds);
     }
 
     public List<FigmaFile> GetDocumentsByKeys(IEnumerable<string> keys)
@@ -250,11 +302,35 @@ public class DatabaseService : IDisposable
         return Conn().Query<FigmaFile>($"SELECT key Key, project_id ProjectId, project_name ProjectName, team_id TeamId, name Name, url Url FROM Documents WHERE key IN ({inList})").ToList();
     }
 
-    public List<FigmaPage> GetPagesByIds(IEnumerable<string> ids)
+    /// <summary>
+    /// Returns pages matching the given composite IDs (format: "documentKey:pageId").
+    /// Uses composite IDs because Figma page IDs are only unique within a file.
+    /// </summary>
+    public List<FigmaPage> GetPagesByCompositeIds(IEnumerable<string> compositeIds)
     {
-        var il = ids.ToList(); if (il.Count == 0) return new();
-        var inList = string.Join(",", il.Select(i => $"'{i.Replace("'","''")}'"));
-        return Conn().Query<FigmaPage>($"SELECT id Id, document_key DocumentKey, name Name, url Url FROM Pages WHERE id IN ({inList})").ToList();
+        // Parse composite IDs into (docKey, pageId) pairs and query by the actual PK columns
+        var pairs = compositeIds
+            .Select(cid =>
+            {
+                var sep = cid.IndexOf(':');
+                return sep > 0 ? (docKey: cid[..sep], pageId: cid[(sep + 1)..]) : default;
+            })
+            .Where(p => p.docKey != null)
+            .ToList();
+        if (pairs.Count == 0) return new();
+
+        // Build WHERE clause with OR conditions for each (document_key, id) pair
+        var c = Conn();
+        var conditions = string.Join(" OR ", pairs.Select((p, i) =>
+            $"(document_key=@dk{i} AND id=@pid{i})"));
+        var sql = $"SELECT id Id, document_key DocumentKey, name Name, url Url FROM Pages WHERE {conditions}";
+        var param = new Dapper.DynamicParameters();
+        for (int i = 0; i < pairs.Count; i++)
+        {
+            param.Add($"dk{i}", pairs[i].docKey);
+            param.Add($"pid{i}", pairs[i].pageId);
+        }
+        return c.Query<FigmaPage>(sql, param).ToList();
     }
 
     /// <summary>
