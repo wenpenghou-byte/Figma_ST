@@ -55,6 +55,7 @@
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Team ID" Binding="{Binding TeamId}" Width="*"/>
                                     <DataGridTextColumn Header="显示名称" Binding="{Binding DisplayName}" Width="*"/>
+                                    <DataGridTextColumn Header="独立 API Key（可选）" Binding="{Binding ApiKey}" Width="*"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                             <Grid Margin="8,6">
@@ -91,6 +92,8 @@
                                Visibility="Collapsed" TextWrapping="Wrap"/>
                     <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,2,0,0"
                                Text="列表顺序决定搜索结果的 Team 展示优先级，排在前面的 Team 优先显示。"/>
+                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"
+                               Text="💡 独立 API Key：如果某个 Team 的文档同步不完整（如页面缺失），可能是因为当前 API Key 对该 Team 仅有查看权限。可以找该 Team 中有编辑权限的同事生成一个 Personal Access Token，填入「独立 API Key」列即可。留空则使用上方的全局 Key。已保存的 Key 不会因留空而被删除。"/>
                 </StackPanel>
                 <!-- Interval + Manual sync -->
                 <StackPanel Margin="0,0,0,16">
