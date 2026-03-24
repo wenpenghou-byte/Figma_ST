@@ -68,6 +68,9 @@ public partial class App : Application
         // Search window (hidden initially)
         SearchWin = new SearchWindow();
 
+        // Show changelog dialog once per version after update
+        ChangelogService.ShowIfUpdated(DB);
+
         // Hotkey — configurable via settings
         Hotkey = new HotkeyService(Dispatcher);
         Hotkey.HotkeyPressed += (_, _) => SearchWin.Toggle();
