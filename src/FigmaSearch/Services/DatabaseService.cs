@@ -44,6 +44,13 @@ public class DatabaseService : IDisposable
         // New schema uses composite PK (id, document_key) so pages from different files
         // never overwrite each other.
         MigratePagesPrimaryKey(c);
+
+        // Migrate: SearchIndex page entity_id format.
+        // Old format: plain page id like "0:1" (not globally unique).
+        // New format: "documentKey:pageId" (globally unique).
+        // If old-format entries are detected, rebuild the entire SearchIndex from
+        // Documents and Pages tables to ensure consistent composite IDs.
+        MigrateSearchIndexPageIds(c);
     }
 
     /// <summary>
@@ -88,6 +95,58 @@ public class DatabaseService : IDisposable
             tx.Commit();
         }
         // else: already migrated or correct schema — no-op
+    }
+
+    /// <summary>
+    /// Detects old-format page entity_ids in SearchIndex (plain "0:1" instead of
+    /// "docKey:0:1") and rebuilds the entire SearchIndex from Documents + Pages.
+    /// Safe to call repeatedly — no-ops if already in new format.
+    /// </summary>
+    private static void MigrateSearchIndexPageIds(SqliteConnection c)
+    {
+        // Quick check: grab one page entity_id and see if it looks like the new format.
+        // New format: "fileKey:pageId" where fileKey is a long alphanumeric Figma key.
+        // Old format: just the page id like "0:1" (very short, starts with a digit).
+        var sample = c.QueryFirstOrDefault<string>(
+            "SELECT entity_id FROM SearchIndex WHERE entity_type='page' LIMIT 1");
+
+        if (sample == null) return; // no pages indexed yet — nothing to migrate
+
+        // New composite ids look like "AbCdEfGhIj1234:0:1" — the part before the
+        // first colon is a Figma file key (10+ alphanumeric chars).
+        // Old ids look like "0:1" — the part before the first colon is a single digit.
+        var firstColon = sample.IndexOf(':');
+        if (firstColon < 0) return; // unexpected format, skip
+        var prefix = sample[..firstColon];
+        if (prefix.Length >= 6) return; // already new format (file keys are long)
+
+        // Old format detected — rebuild SearchIndex from source tables
+        using var tx = c.BeginTransaction();
+        c.Execute("DELETE FROM SearchIndex", transaction: tx);
+
+        // Re-index all documents
+        var docs = c.Query<(string key, string name, string teamId)>(
+            "SELECT key, name, team_id FROM Documents", transaction: tx).ToList();
+        foreach (var d in docs)
+        {
+            c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('document',@key,@name,@teamId,@key)",
+                new { d.key, d.name, d.teamId }, tx);
+        }
+
+        // Re-index all pages with new composite entity_id format
+        var pages = c.Query<(string id, string document_key, string name)>(
+            "SELECT id, document_key, name FROM Pages", transaction: tx).ToList();
+
+        // Build a lookup for teamId from Documents
+        var docTeamMap = docs.ToDictionary(d => d.key, d => d.teamId);
+        foreach (var p in pages)
+        {
+            var teamId = docTeamMap.GetValueOrDefault(p.document_key, "");
+            c.Execute("INSERT INTO SearchIndex(entity_type,entity_id,display_name,team_id,document_key) VALUES('page',@compositeId,@name,@teamId,@docKey)",
+                new { compositeId = $"{p.document_key}:{p.id}", name = p.name, teamId, docKey = p.document_key }, tx);
+        }
+
+        tx.Commit();
     }
 
     public string? GetSetting(string key) =>
