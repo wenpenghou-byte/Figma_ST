@@ -31,6 +31,7 @@ public partial class SettingsWindow : Window
         ThemeCombo.SelectionChanged += ThemeCombo_Changed;
         VersionLabel.Text = $"当前版本：{UpdateService.CurrentVersion()}";
         UpdateDbStats();
+        OpenInBrowserCheck.IsChecked = _vm.OpenInBrowser;
 
         // If there's already a pending update, show install button immediately
         if (App.PendingUpdate != null)
@@ -154,6 +155,9 @@ public partial class SettingsWindow : Window
 
     private void StartupCheck_Changed(object s, RoutedEventArgs e) =>
         _vm.LaunchAtStartup = StartupCheck.IsChecked == true;
+
+    private void OpenInBrowserCheck_Changed(object s, RoutedEventArgs e) =>
+        _vm.OpenInBrowser = OpenInBrowserCheck.IsChecked == true;
 
     private void ThemeCombo_Changed(object s, SelectionChangedEventArgs e)
     {

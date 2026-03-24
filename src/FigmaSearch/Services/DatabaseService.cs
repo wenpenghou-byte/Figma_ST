@@ -166,7 +166,8 @@ public class DatabaseService : IDisposable
             LastUpdateCheckDate = GetSetting("last_update_check_date") ?? "",
             AppVersion          = GetSetting("app_version") ?? "1.0.0",
             IsFirstRun          = GetSetting("is_first_run") != "0",
-            Theme               = GetSetting("theme") ?? "Dark"
+            Theme               = GetSetting("theme") ?? "Dark",
+            OpenInBrowser       = GetSetting("open_in_browser") == "1"
         };
         if (DateTime.TryParse(GetSetting("last_sync_time"), out var dt)) s.LastSyncTime = dt;
         return s;
@@ -182,6 +183,7 @@ public class DatabaseService : IDisposable
         SetSetting("is_first_run",           s.IsFirstRun ? "1" : "0");
         SetSetting("last_sync_time",         s.LastSyncTime?.ToString("o") ?? "");
         SetSetting("theme",                  s.Theme);
+        SetSetting("open_in_browser",        s.OpenInBrowser ? "1" : "0");
     }
 
     public List<TeamConfig> GetTeams() =>
