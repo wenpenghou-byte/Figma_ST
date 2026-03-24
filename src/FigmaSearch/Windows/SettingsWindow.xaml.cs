@@ -31,6 +31,7 @@ public partial class SettingsWindow : Window
         ThemeCombo.SelectionChanged += ThemeCombo_Changed;
         VersionLabel.Text = $"当前版本：{UpdateService.CurrentVersion()}";
         UpdateDbStats();
+        OpenInBrowserCheck.IsChecked = _vm.OpenInBrowser;
 
         // BrainMaker AI fields
         BmAuthAccountBox.Text = _vm.BmAuthAccount;
