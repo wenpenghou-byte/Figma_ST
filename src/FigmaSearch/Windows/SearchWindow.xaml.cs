@@ -401,13 +401,22 @@ public partial class SearchWindow : Window
     }
 
     /// <summary>
-    /// Opens a Figma URL, preferring the desktop client (figma:// protocol).
-    /// Falls back to the default browser if the desktop app is not installed
-    /// or the protocol launch fails.
+    /// Opens a Figma URL. When OpenInBrowser is enabled in settings, opens
+    /// directly in the default browser. Otherwise tries the Figma desktop
+    /// client first (figma:// protocol) and falls back to browser on failure.
     /// </summary>
     private static void OpenUrl(string url)
     {
         if (string.IsNullOrEmpty(url)) return;
+
+        var settings = App.DB.LoadSettings();
+        if (settings.OpenInBrowser)
+        {
+            // User prefers browser — open https:// URL directly
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+            catch { }
+            return;
+        }
 
         // Convert https://www.figma.com/... → figma://...
         var figmaUri = url

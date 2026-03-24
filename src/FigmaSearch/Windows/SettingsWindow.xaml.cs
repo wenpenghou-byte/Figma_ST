@@ -39,6 +39,8 @@ public partial class SettingsWindow : Window
         BmProjectBox.Text = _vm.BmProject;
         BmDocsetBox.Text = _vm.BmDocset;
 
+        OpenInBrowserCheck.IsChecked = _vm.OpenInBrowser;
+
         // If there's already a pending update, show install button immediately
         if (App.PendingUpdate != null)
             ShowInstallButton($"发现新版本 v{App.PendingUpdate.LatestVersion}");
@@ -161,6 +163,9 @@ public partial class SettingsWindow : Window
 
     private void StartupCheck_Changed(object s, RoutedEventArgs e) =>
         _vm.LaunchAtStartup = StartupCheck.IsChecked == true;
+
+    private void OpenInBrowserCheck_Changed(object s, RoutedEventArgs e) =>
+        _vm.OpenInBrowser = OpenInBrowserCheck.IsChecked == true;
 
     private void ThemeCombo_Changed(object s, SelectionChangedEventArgs e)
     {

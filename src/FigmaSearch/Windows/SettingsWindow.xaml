@@ -117,6 +117,12 @@
                     </StackPanel>
                     <TextBlock x:Name="DbStats" Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,8,0,0"/>
                 </StackPanel>
+                <!-- Open in browser -->
+                <CheckBox x:Name="OpenInBrowserCheck" Content="使用浏览器打开 Figma 链接（而非桌面客户端）"
+                          Foreground="{StaticResource FgPrimary}" Margin="0,0,0,4"
+                          Checked="OpenInBrowserCheck_Changed" Unchecked="OpenInBrowserCheck_Changed"/>
+                <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="18,0,0,16"
+                           Text="如果 Figma 桌面客户端打开后白屏，可开启此选项改用浏览器打开"/>
                 <!-- Startup -->
                 <CheckBox x:Name="StartupCheck" Content="开机启动"
                           Foreground="{StaticResource FgPrimary}" Margin="0,0,0,16"

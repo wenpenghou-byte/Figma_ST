@@ -11,6 +11,7 @@ public class AppSettings
     public string AppVersion { get; set; } = "1.0.0";
     public bool IsFirstRun { get; set; } = true;
     public string Theme { get; set; } = "Dark"; // "Dark" | "Light"
+    public bool OpenInBrowser { get; set; } = false; // true = open Figma links in browser instead of desktop app
 
     // ── BrainMaker AI ────────────────────────────────────────
     public string BmAuthAccount { get; set; } = string.Empty;

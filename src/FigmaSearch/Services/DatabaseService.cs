@@ -170,7 +170,8 @@ public class DatabaseService : IDisposable
             BmAuthAccount       = GetSetting("bm_auth_account") ?? "",
             BmAuthKey           = GetSetting("bm_auth_key") ?? "",
             BmUserCorp          = GetSetting("bm_user_corp") ?? "",
-            BmProject           = GetSetting("bm_project") ?? "space_houwenpeng"
+            BmProject           = GetSetting("bm_project") ?? "space_houwenpeng",
+            OpenInBrowser       = GetSetting("open_in_browser") == "1"
         };
         if (DateTime.TryParse(GetSetting("last_sync_time"), out var dt)) s.LastSyncTime = dt;
         return s;
@@ -190,6 +191,7 @@ public class DatabaseService : IDisposable
         SetSetting("bm_auth_key",            s.BmAuthKey);
         SetSetting("bm_user_corp",           s.BmUserCorp);
         SetSetting("bm_project",             s.BmProject);
+        SetSetting("open_in_browser",        s.OpenInBrowser ? "1" : "0");
     }
 
     public List<TeamConfig> GetTeams() =>

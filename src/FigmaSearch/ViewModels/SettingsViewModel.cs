@@ -43,6 +43,12 @@ public class SettingsViewModel : INotifyPropertyChanged
         set { _settings.Theme = value; OnPropertyChanged(); }
     }
 
+    public bool OpenInBrowser
+    {
+        get => _settings.OpenInBrowser;
+        set { _settings.OpenInBrowser = value; OnPropertyChanged(); }
+    }
+
     // ── BrainMaker AI ────────────────────────────────────────
     public string BmAuthAccount
     {
