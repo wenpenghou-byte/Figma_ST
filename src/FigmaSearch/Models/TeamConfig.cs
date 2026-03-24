@@ -8,6 +8,12 @@ public class TeamConfig
     public string TeamId { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public int SortOrder { get; set; }
+    /// <summary>
+    /// Optional per-team API key. When set, this team's sync uses this key
+    /// instead of the global one. Useful when the global key has view-only
+    /// access and a team member with edit access provides their own token.
+    /// </summary>
+    public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>
     /// Validates and normalizes a Team ID input string.

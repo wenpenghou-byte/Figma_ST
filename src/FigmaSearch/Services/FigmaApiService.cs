@@ -106,7 +106,7 @@ public class FigmaApiService
     /// </summary>
     public async Task SyncAllTeamsAsync(
         List<TeamConfig> teams,
-        string token,
+        string globalToken,
         IProgress<SyncProgress> progress,
         Func<string, bool>? hasPages = null,
         Action<FigmaFile, List<FigmaPage>?>? onFileSynced = null,
@@ -118,6 +118,9 @@ public class FigmaApiService
             // Check cancel only between teams — never mid-file
             if (ct.IsCancellationRequested) return;
             var team = teams[ti];
+
+            // Use per-team API key if configured, otherwise fall back to global key
+            var token = !string.IsNullOrEmpty(team.ApiKey) ? team.ApiKey : globalToken;
 
             progress.Report(new SyncProgress
             {

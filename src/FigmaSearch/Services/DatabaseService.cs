@@ -51,6 +51,9 @@ public class DatabaseService : IDisposable
         // If old-format entries are detected, rebuild the entire SearchIndex from
         // Documents and Pages tables to ensure consistent composite IDs.
         MigrateSearchIndexPageIds(c);
+
+        // Migrate: add api_key column to Teams for per-team API key support
+        try { c.Execute("ALTER TABLE Teams ADD COLUMN api_key TEXT DEFAULT ''"); } catch { /* column already exists */ }
     }
 
     /// <summary>
@@ -195,11 +198,16 @@ public class DatabaseService : IDisposable
     }
 
     public List<TeamConfig> GetTeams() =>
-        Conn().Query<TeamConfig>("SELECT id, team_id TeamId, display_name DisplayName, sort_order SortOrder FROM Teams ORDER BY sort_order, id").ToList();
+        Conn().Query<TeamConfig>("SELECT id, team_id TeamId, display_name DisplayName, sort_order SortOrder, COALESCE(api_key,'') ApiKey FROM Teams ORDER BY sort_order, id").ToList();
 
     public void SaveTeams(IEnumerable<TeamConfig> teams)
     {
         var c = Conn(); using var tx = c.BeginTransaction();
+
+        // Snapshot existing API keys so we can preserve them when incoming value is empty
+        var existingKeys = c.Query<(string teamId, string apiKey)>(
+            "SELECT team_id, COALESCE(api_key,'') FROM Teams", transaction: tx)
+            .ToDictionary(x => x.teamId, x => x.apiKey);
 
         // Detect removed teams and purge their documents/pages/search index
         var oldTeamIds = c.Query<string>("SELECT team_id FROM Teams", transaction: tx).ToHashSet();
@@ -221,8 +229,16 @@ public class DatabaseService : IDisposable
         c.Execute("DELETE FROM Teams", transaction: tx);
         int order = 0;
         foreach (var t in teams)
-            c.Execute("INSERT INTO Teams(team_id,display_name,sort_order) VALUES(@TeamId,@DisplayName,@SortOrder)",
-                new { t.TeamId, t.DisplayName, SortOrder = order++ }, transaction: tx);
+        {
+            // Preserve existing API key if the incoming value is empty.
+            // This prevents accidental deletion when a masked PasswordBox
+            // sends back an empty string on save.
+            var effectiveKey = string.IsNullOrEmpty(t.ApiKey)
+                ? (existingKeys.GetValueOrDefault(t.TeamId) ?? "")
+                : t.ApiKey;
+            c.Execute("INSERT INTO Teams(team_id,display_name,sort_order,api_key) VALUES(@TeamId,@DisplayName,@SortOrder,@ApiKey)",
+                new { t.TeamId, t.DisplayName, SortOrder = order++, ApiKey = effectiveKey }, transaction: tx);
+        }
         tx.Commit();
     }
     // ── Legacy full-replace (kept for compatibility, not used by incremental sync) ──
