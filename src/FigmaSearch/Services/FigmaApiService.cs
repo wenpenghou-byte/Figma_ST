@@ -250,6 +250,22 @@ public class FigmaApiService
                                     Url         = $"{fileUrl}?node-id={nodeId}"
                                 });
                             }
+
+                            // Every Figma file has at least 1 page. If the API returned 0 pages,
+                            // the token likely lacks sufficient access (view-only on some files
+                            // returns an empty children array). Treat this as a failure so we
+                            // preserve any previously-synced pages rather than wiping them.
+                            if (filePages.Count == 0)
+                            {
+                                System.Diagnostics.Debug.WriteLine(
+                                    $"[FigmaApi] WARNING: API returned 0 pages for {fileName} ({fileKey}) — possible permission issue");
+                                if (attempt >= maxPageAttempts)
+                                    failedFileNames.Add($"{fileName}(0页)");
+                                else
+                                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
+                                continue; // retry — do NOT set pagesFetchOk
+                            }
+
                             pagesFetchOk = true;
                         }
                         catch (Exception ex) when (ex is not FigmaAuthException)
