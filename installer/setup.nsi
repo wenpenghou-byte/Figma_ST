@@ -8,7 +8,7 @@
   !define PRODUCT_VERSION  "1.0.0"
 !endif
 !define PRODUCT_PUBLISHER "wenpenghou-byte"
-!define PRODUCT_URL      "https://github.com/wenpenghou-byte/Figma_ST"
+!define PRODUCT_URL      "https://gitlab.nie.netease.com/joker1/figst"
 !define UNINST_KEY       "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define RUN_KEY          "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 

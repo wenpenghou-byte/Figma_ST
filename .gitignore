@@ -35,3 +35,14 @@ packages/
 
 # Publish profiles
 **/Properties/PublishProfiles/
+
+# Local secrets (never commit)
+gitlab_token.txt
+
+# Junk files
+nul
+
+# Local debug/diagnose tools
+diagnose/
+diagnose.csx
+

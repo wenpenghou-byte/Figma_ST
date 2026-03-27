@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>FigmaSearch</AssemblyName>
     <RootNamespace>FigmaSearch</RootNamespace>
-    <Version>1.3.36</Version>
+    <Version>1.3.37</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Resources\app.ico</ApplicationIcon>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
