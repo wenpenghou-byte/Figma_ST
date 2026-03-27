@@ -17,8 +17,8 @@ public class UpdateService
     // GitLab API: get latest release for project 36568
     private const string GITLAB_RELEASES_API = "https://gitlab.nie.netease.com/api/v4/projects/36568/releases?per_page=1";
     private const string DOWNLOAD_URL_TEMPLATE = "https://gitlab.nie.netease.com/joker1/figst/-/releases/{0}/downloads/FigmaSearch_Setup.exe";
-    // Read-only token (read_repository only, cannot modify anything)
-    private const string GITLAB_READ_TOKEN = "aYYpQYxjKMuT321ceKM-";
+    // Read-only token (read_api only, cannot modify anything)
+    private const string GITLAB_READ_TOKEN = "jz8bhLiv7dRH4cR6zr4z";
 
     private readonly HttpClient _http;
 
@@ -98,6 +98,7 @@ public class UpdateService
     {
         using var dlClient = new HttpClient();
         dlClient.DefaultRequestHeaders.Add("User-Agent", "FigmaSearch/1.0");
+        dlClient.DefaultRequestHeaders.Add("PRIVATE-TOKEN", GITLAB_READ_TOKEN);
 
         var tempPath = Path.Combine(Path.GetTempPath(), "FigmaSearch_Update.exe");
         using var resp = await dlClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
