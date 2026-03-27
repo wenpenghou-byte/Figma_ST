@@ -96,14 +96,22 @@ public class FigmaApiService
     }
 
     /// <summary>
-    /// Full sync: fetches all teams' files and ALL pages for every file.
-    /// Every file's pages are always re-fetched to guarantee completeness.
-    /// If a file's page fetch fails (403, network, etc.), existing DB pages are preserved.
-    /// Cancellation is only checked between files (never mid-file), so every started
-    /// file is guaranteed to be fully persisted.
-    /// Files are synced in last_modified descending order so recently-changed
-    /// documents are processed first.
+    /// Incremental sync: fetches all teams' files but only re-fetches pages for files
+    /// whose Figma last_modified timestamp has changed since the last sync.
+    /// Unchanged files get a lightweight metadata upsert (name/URL) but skip the
+    /// expensive per-file GET /files/{key}?depth=1 call.
+    ///
+    /// - If a file's page fetch fails (403, network, etc.), existing DB pages are preserved.
+    /// - Cancellation is only checked between files (never mid-file), so every started
+    ///   file is guaranteed to be fully persisted.
+    /// - Files are sorted last_modified descending so recently-changed files are first.
     /// </summary>
+    /// <param name="getSyncedModified">
+    /// Returns a dict of (file_key → stored figma_last_modified) for a given team.
+    /// When provided, files whose last_modified matches the stored value are skipped
+    /// (metadata is still upserted, but pages are not re-fetched).
+    /// Pass null to disable incremental logic (full re-sync).
+    /// </param>
     public async Task SyncAllTeamsAsync(
         List<TeamConfig> teams,
         string globalToken,
@@ -111,6 +119,7 @@ public class FigmaApiService
         Func<string, bool>? hasPages = null,
         Action<FigmaFile, List<FigmaPage>?>? onFileSynced = null,
         Action<string, HashSet<string>>? onTeamFinished = null,
+        Func<string, Dictionary<string, string>>? getSyncedModified = null,
         CancellationToken ct = default)
     {
         for (int ti = 0; ti < teams.Count; ti++)
@@ -133,6 +142,7 @@ public class FigmaApiService
 
             var teamFileKeys = new HashSet<string>(); // tracks all file keys seen for this team
             int syncedFiles = 0;
+            int skippedTotal = 0; // files skipped because last_modified unchanged
             var failedFileNames = new List<string>(); // collect failed file names for user visibility
             bool teamFullyCompleted = true; // tracks whether ALL files in this team were processed
 
@@ -189,6 +199,10 @@ public class FigmaApiService
                     return string.Compare(bLm, aLm, StringComparison.Ordinal); // descending
                 });
 
+                // Load stored last_modified map for this team once per project loop
+                // (lazy: only when incremental sync is enabled)
+                Dictionary<string, string>? storedModifiedMap = getSyncedModified?.Invoke(team.TeamId);
+
                 for (int fi = 0; fi < files.Count; fi++)
                 {
                     // Check cancel BEFORE starting a file — once started, always finish
@@ -203,15 +217,6 @@ public class FigmaApiService
 
                     teamFileKeys.Add(fileKey);
 
-                    progress.Report(new SyncProgress
-                    {
-                        Phase    = "正在获取页面信息",
-                        TeamName = team.DisplayName,
-                        Current  = fi + 1,
-                        Total    = files.Count,
-                        Detail   = fileName
-                    });
-
                     var doc = new FigmaFile
                     {
                         Key              = fileKey,
@@ -223,12 +228,42 @@ public class FigmaApiService
                         FigmaLastModified = lastModified
                     };
 
+                    // ── Incremental sync: skip page fetch if file unchanged ──────────
+                    // Compare Figma's last_modified with what we stored in the DB.
+                    // If they match AND the file already has pages, just upsert metadata
+                    // (name/URL/last_modified) and move on — no GET /files/{key} call.
+                    bool dbHasPages = hasPages?.Invoke(fileKey) ?? true;
+                    if (storedModifiedMap != null
+                        && !string.IsNullOrEmpty(lastModified)
+                        && storedModifiedMap.TryGetValue(fileKey, out var storedLm)
+                        && storedLm == lastModified
+                        && dbHasPages)
+                    {
+                        // File content unchanged — upsert metadata only (pages = null keeps existing)
+                        onFileSynced?.Invoke(doc, null);
+                        skippedTotal++;
+                        syncedFiles++;
+
+                        // Rate limit delay (shorter for skipped files)
+                        try { await Task.Delay(20, ct); }
+                        catch (OperationCanceledException) { /* that's fine */ }
+                        continue;
+                    }
+
+                    progress.Report(new SyncProgress
+                    {
+                        Phase    = "正在获取页面信息",
+                        TeamName = team.DisplayName,
+                        Current  = fi + 1,
+                        Total    = files.Count,
+                        Detail   = fileName
+                    });
+
                     // Fetch pages with retry (up to 3 attempts with exponential back-off).
                     // Also force retry for files that exist in DB but have zero pages
                     // (leftover from a previous sync where page-fetch silently failed).
                     var filePages = new List<FigmaPage>();
                     bool pagesFetchOk = false;
-                    bool dbHasPages = hasPages?.Invoke(fileKey) ?? true;
                     const int maxPageAttempts = 3;
 
                     for (int attempt = 1; attempt <= maxPageAttempts && !pagesFetchOk; attempt++)
@@ -322,15 +357,17 @@ public class FigmaApiService
             }
 
             string detail2;
+            var updatedCount = syncedFiles - skippedTotal;
+            var skippedSuffix = skippedTotal > 0 ? $"，跳过 {skippedTotal} 个未变更" : "";
             if (failedFileNames.Count > 0)
             {
                 var names = string.Join("、", failedFileNames.Take(5));
                 var suffix = failedFileNames.Count > 5 ? $" 等 {failedFileNames.Count} 个文件" : "";
-                detail2 = $"同步 {syncedFiles} 个文件，{failedFileNames.Count} 个获取失败：{names}{suffix}";
+                detail2 = $"更新 {updatedCount} 个文件{skippedSuffix}，{failedFileNames.Count} 个获取失败：{names}{suffix}";
             }
             else
             {
-                detail2 = $"同步 {syncedFiles} 个文件";
+                detail2 = $"更新 {updatedCount} 个文件{skippedSuffix}";
             }
             progress.Report(new SyncProgress
             {

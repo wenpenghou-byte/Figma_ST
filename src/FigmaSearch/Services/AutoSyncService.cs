@@ -101,6 +101,7 @@ public class AutoSyncService : IDisposable
                     _db.RemoveDeletedFiles(teamId, currentKeys);
                     _db.SetLastSyncTime(DateTime.UtcNow);
                 },
+                getSyncedModified: (teamId) => _db.GetSyncedFileKeys(teamId),
                 ct: _cts.Token);
             success = true;
         }
