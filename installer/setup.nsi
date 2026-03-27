@@ -30,7 +30,8 @@ Unicode True
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\FigmaSearch.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Launch FigmaSearch now"
+!define MUI_FINISHPAGE_RUN_TEXT "立即启动 FigmaSearch"
+!define MUI_FINISHPAGE_RUN_CHECKED
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_WELCOME

@@ -13,7 +13,9 @@ public static class ChangelogService
     /// </summary>
     public static readonly List<string> Notes = new()
     {
-        "优化：设置页面 Team 列表改版——输入框直接显示深色底，所见即所得；「添加」按钮改为横跨整行的「＋ 添加一行」，点击新增空行后直接填写即可，无需再点写入",
+        "修复：设置窗口滚动条不再遮挡内容",
+        "优化：独立 API Key 说明移至标题旁「?」按钮，鼠标悬浮查看，界面更简洁",
+        "修复：更新检测现已正常工作，可自动检测并下载新版本",
     };
 
     /// <summary>
