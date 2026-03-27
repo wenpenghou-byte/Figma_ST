@@ -1,0 +1,73 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore src/FigmaSearch/FigmaSearch.csproj
+
+      - name: Build & Publish
+        shell: bash
+        run: |
+          dotnet publish src/FigmaSearch/FigmaSearch.csproj \
+            -c Release \
+            -r win-x64 \
+            --self-contained false \
+            -p:PublishSingleFile=true \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -o installer/publish
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+          refreshenv
+          echo "C:\Program Files (x86)\NSIS" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+          echo "C:\Program Files\NSIS" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+
+      - name: Create dist folder
+        shell: bash
+        run: mkdir -p installer/dist
+
+      - name: Build NSIS installer
+        shell: pwsh
+        working-directory: installer
+        run: |
+          $nsisPath = if (Test-Path "C:\Program Files (x86)\NSIS\makensis.exe") {
+            "C:\Program Files (x86)\NSIS\makensis.exe"
+          } elseif (Test-Path "C:\Program Files\NSIS\makensis.exe") {
+            "C:\Program Files\NSIS\makensis.exe"
+          } else {
+            "makensis"
+          }
+          & $nsisPath /DPRODUCT_VERSION=${{ steps.version.outputs.version }} setup.nsi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FigmaSearch_Setup
+          path: installer/dist/FigmaSearch_Setup.exe
+          retention-days: 3
