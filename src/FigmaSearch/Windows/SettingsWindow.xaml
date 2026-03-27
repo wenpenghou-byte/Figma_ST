@@ -18,19 +18,21 @@
             <StackPanel>
                 <!-- API Key -->
                 <StackPanel Margin="0,0,0,16">
-                    <TextBlock Text="Figma API Key" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Figma API Key" Foreground="{StaticResource FgSecondary}" FontSize="12"/>
+                        <Button Content="?" Margin="6,0,0,0"
+                                Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
+                                Foreground="{StaticResource FgSecondary}" Padding="6,1" FontSize="11"
+                                ToolTip="如何获取 API Key？" Click="ApiKeyHelp_Click"/>
+                    </StackPanel>
                     <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <PasswordBox x:Name="ApiKeyBox" Background="{StaticResource BgTertiary}"
                                      Foreground="{StaticResource FgPrimary}" BorderBrush="{StaticResource BorderColor}"
                                      Padding="10,8" FontSize="13" PasswordChanged="ApiKeyBox_Changed"/>
                         <Button Grid.Column="1" Content="验证" Margin="8,0,0,0"
                                 Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
                                 Foreground="{StaticResource FgPrimary}" Padding="12,8" Click="ValidateApiKey_Click"/>
-                        <Button Grid.Column="2" Content="?" Margin="4,0,0,0"
-                                Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
-                                Foreground="{StaticResource FgSecondary}" Padding="10,8"
-                                ToolTip="如何获取 API Key？" Click="ApiKeyHelp_Click"/>
                     </Grid>
                     <TextBlock x:Name="ApiKeyStatus" FontSize="11" Margin="0,4,0,0" Visibility="Collapsed"/>
                 </StackPanel>
@@ -43,46 +45,71 @@
                                 Foreground="{StaticResource FgSecondary}" Padding="6,1" FontSize="11"
                                 ToolTip="如何获取 Team ID？" Click="TeamIdHelp_Click"/>
                     </StackPanel>
-                    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4">
+                    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4"
+                            Background="{StaticResource BgTertiary}" Padding="0">
                         <StackPanel>
-                            <DataGrid x:Name="TeamsGrid" Background="{StaticResource BgTertiary}"
-                                      Foreground="{StaticResource FgPrimary}" BorderThickness="0"
-                                      RowBackground="{StaticResource BgTertiary}"
-                                      AlternatingRowBackground="{StaticResource BgSecondary}"
-                                      GridLinesVisibility="None" HeadersVisibility="Column"
-                                      AutoGenerateColumns="False" CanUserAddRows="False"
-                                      MinHeight="60" MaxHeight="180">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Team ID" Binding="{Binding TeamId}" Width="*"/>
-                                    <DataGridTextColumn Header="显示名称" Binding="{Binding DisplayName}" Width="*"/>
-                                    <DataGridTextColumn Header="独立 API Key（可选）" Binding="{Binding ApiKey}" Width="*"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                            <Grid Margin="8,6">
+                            <!-- Column headers -->
+                            <Grid Margin="10,8,10,4">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="80"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Team ID" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="1" Text="显示名称" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold" Margin="4,0,0,0"/>
+                                <TextBlock Grid.Column="2" Text="独立 API Key（可选）" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold" Margin="4,0,0,0"/>
+                            </Grid>
+                            <!-- Existing teams (editable rows) -->
+                            <ItemsControl x:Name="TeamsItemsControl" MinHeight="0" MaxHeight="240">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="10,2,10,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="80"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" Text="{Binding TeamId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6" Margin="0,0,4,0"/>
+                                            <TextBox Grid.Column="1" Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6" Margin="0,0,4,0"/>
+                                            <PasswordBox Grid.Column="2" Tag="{Binding}" Padding="6,6" FontSize="12" Margin="0,0,4,0"
+                                                         Background="{StaticResource BgSecondary}" Foreground="{StaticResource FgPrimary}"
+                                                         BorderBrush="Transparent" BorderThickness="0"
+                                                         PasswordChanged="TeamApiKey_PasswordChanged"/>
+                                            <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <Button Content="▲" Style="{StaticResource FlatButton}" Padding="6,4" FontSize="10"
+                                                        ToolTip="上移" Tag="{Binding}" Click="MoveTeamUp_Click"/>
+                                                <Button Content="▼" Style="{StaticResource FlatButton}" Padding="6,4" FontSize="10"
+                                                        ToolTip="下移" Tag="{Binding}" Click="MoveTeamDown_Click"/>
+                                                <Button Content="✕" Style="{StaticResource FlatButton}" Padding="6,4" FontSize="10"
+                                                        Foreground="{StaticResource ErrorRed}" ToolTip="删除"
+                                                        Tag="{Binding}" Click="RemoveTeam_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- Add new team row -->
+                            <Grid Margin="10,4,10,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="80"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="NewTeamId" Grid.Column="0" Margin="0,0,4,0"
-                                         Style="{StaticResource SearchBox}" FontSize="13"
+                                         Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6"
                                          TextChanged="NewTeam_TextChanged"/>
                                 <TextBox x:Name="NewTeamName" Grid.Column="1" Margin="0,0,4,0"
-                                         Style="{StaticResource SearchBox}" FontSize="13"
+                                         Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6"
                                          TextChanged="NewTeam_TextChanged"/>
-                                <Button x:Name="AddTeamBtn" Grid.Column="2" Content="写入" Margin="0,0,4,0"
+                                <Border Grid.Column="2" Margin="0,0,4,0"/>
+                                <Button x:Name="AddTeamBtn" Grid.Column="3" Content="＋ 添加"
                                         Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
-                                        Padding="12,6" IsEnabled="False" Click="AddTeam_Click"/>
-                                <Button Grid.Column="3" Content="删除选中" Margin="0,0,4,0"
-                                        Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
-                                        Padding="12,6" Click="RemoveTeam_Click"/>
-                                <Button Grid.Column="4" Content="▲" Margin="0,0,2,0"
-                                        Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
-                                        Padding="10,6" ToolTip="上移" Click="MoveTeamUp_Click"/>
-                                <Button Grid.Column="5" Content="▼" Margin="0,0,0,0"
-                                        Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
-                                        Padding="10,6" ToolTip="下移" Click="MoveTeamDown_Click"/>
+                                        Padding="8,6" FontSize="11" IsEnabled="False" Click="AddTeam_Click"/>
                             </Grid>
                         </StackPanel>
                     </Border>

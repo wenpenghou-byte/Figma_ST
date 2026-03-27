@@ -13,8 +13,8 @@ public static class ChangelogService
     /// </summary>
     public static readonly List<string> Notes = new()
     {
-        "优化：增量同步——仅对 Figma 中有变更的文件重新拉取页面数据，大幅减少同步耗时",
-        "优化：同步完成后显示「更新 X 个文件，跳过 Y 个未变更」统计信息",
+        "优化：设置页面 Team IDs 改版——每行直接显示为可编辑输入框，无需「写入」按钮；删除和上下移动按钮直接在每行后方，无需先选中",
+        "优化：设置页面 Figma API Key 的帮助按钮（?）移至标题旁，与 Team IDs 风格一致",
     };
 
     /// <summary>

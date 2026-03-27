@@ -19,7 +19,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _vm = new SettingsViewModel(App.DB);
         DataContext = _vm;
-        TeamsGrid.ItemsSource = _vm.Teams;
+        TeamsItemsControl.ItemsSource = _vm.Teams;
         ApiKeyBox.Password = _vm.FigmaApiKey;
         IntervalSlider.Value = _vm.UpdateIntervalHours;
         IntervalLabel.Text = $"{_vm.UpdateIntervalHours} 小时";
@@ -36,6 +36,47 @@ public partial class SettingsWindow : Window
         // If there's already a pending update, show install button immediately
         if (App.PendingUpdate != null)
             ShowInstallButton($"发现新版本 v{App.PendingUpdate.LatestVersion}");
+
+        // Fill PasswordBoxes with existing API keys after layout is ready
+        // (PasswordBox doesn't support data binding, so we do it manually)
+        TeamsItemsControl.Loaded += TeamsItemsControl_Loaded;
+    }
+
+    /// <summary>
+    /// After the ItemsControl renders, walk each row's PasswordBox and fill in the stored API key.
+    /// </summary>
+    private void TeamsItemsControl_Loaded(object sender, RoutedEventArgs e)
+    {
+        FillTeamApiKeyBoxes();
+        // Also refresh whenever the items change (add/remove/reorder)
+        _vm.Teams.CollectionChanged += (_, _) =>
+            Dispatcher.BeginInvoke(new Action(FillTeamApiKeyBoxes), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void FillTeamApiKeyBoxes()
+    {
+        var container = TeamsItemsControl;
+        for (int i = 0; i < _vm.Teams.Count; i++)
+        {
+            var item = container.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+            if (item == null) continue;
+            var pb = FindChild<PasswordBox>(item);
+            if (pb != null && pb.Password != _vm.Teams[i].ApiKey)
+                pb.Password = _vm.Teams[i].ApiKey;
+        }
+    }
+
+    /// <summary>Walk the visual tree to find a child of a given type.</summary>
+    private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T t) return t;
+            var result = FindChild<T>(child);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     private void UpdateDbStats()
@@ -113,7 +154,7 @@ public partial class SettingsWindow : Window
 
     private void RemoveTeam_Click(object s, RoutedEventArgs e)
     {
-        if (TeamsGrid.SelectedItem is not TeamConfig t) return;
+        if (s is not FrameworkElement fe || fe.Tag is not TeamConfig t) return;
 
         var result = MessageBox.Show(
             $"确定要删除 Team「{t.DisplayName}」吗？\n\n该操作会同步删除该 Team 下所有已拉取的文档和页面数据。",
@@ -127,20 +168,28 @@ public partial class SettingsWindow : Window
 
     private void MoveTeamUp_Click(object s, RoutedEventArgs e)
     {
-        if (TeamsGrid.SelectedItem is not TeamConfig t) return;
+        if (s is not FrameworkElement fe || fe.Tag is not TeamConfig t) return;
         var idx = _vm.Teams.IndexOf(t);
         if (idx <= 0) return;
         _vm.Teams.Move(idx, idx - 1);
-        TeamsGrid.SelectedItem = t;
     }
 
     private void MoveTeamDown_Click(object s, RoutedEventArgs e)
     {
-        if (TeamsGrid.SelectedItem is not TeamConfig t) return;
+        if (s is not FrameworkElement fe || fe.Tag is not TeamConfig t) return;
         var idx = _vm.Teams.IndexOf(t);
         if (idx < 0 || idx >= _vm.Teams.Count - 1) return;
         _vm.Teams.Move(idx, idx + 1);
-        TeamsGrid.SelectedItem = t;
+    }
+
+    /// <summary>
+    /// Syncs PasswordBox content back to the TeamConfig model.
+    /// PasswordBox doesn't support data binding, so we use Tag to find the bound item.
+    /// </summary>
+    private void TeamApiKey_PasswordChanged(object s, RoutedEventArgs e)
+    {
+        if (s is PasswordBox pb && pb.Tag is TeamConfig t)
+            t.ApiKey = pb.Password;
     }
 
     // ── Interval / Startup ───────────────────────────────────────
