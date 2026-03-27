@@ -14,7 +14,7 @@
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="设置" FontSize="20" FontWeight="Bold"
                    Foreground="{StaticResource FgPrimary}" Margin="0,0,0,20"/>
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,16,0">
             <StackPanel>
                 <!-- API Key -->
                 <StackPanel Margin="0,0,0,16">
@@ -58,7 +58,19 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Team ID" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold"/>
                                 <TextBlock Grid.Column="1" Text="显示名称" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold" Margin="4,0,0,0"/>
-                                <TextBlock Grid.Column="2" Text="独立 API Key（可选）" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold" Margin="4,0,0,0"/>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="4,0,0,0">
+                                    <TextBlock Text="独立 API Key（可选）" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <Button Content="?" Margin="4,0,0,0" VerticalAlignment="Center"
+                                            Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
+                                            Foreground="{StaticResource FgSecondary}" Padding="6,1" FontSize="11">
+                                        <Button.ToolTip>
+                                            <ToolTip MaxWidth="320">
+                                                <TextBlock TextWrapping="Wrap"
+                                                           Text="如果某个 Team 的文档同步不完整（如页面缺失），可能是因为当前 API Key 对该 Team 仅有查看权限。可以找该 Team 中有编辑权限的同事生成一个 Personal Access Token，填入「独立 API Key」列即可。留空则使用上方的全局 Key。已保存的 Key 不会因留空而被删除。"/>
+                                            </ToolTip>
+                                        </Button.ToolTip>
+                                    </Button>
+                                </StackPanel>
                             </Grid>
                             <!-- Existing teams (editable rows) -->
                             <ItemsControl x:Name="TeamsItemsControl" MinHeight="0" MaxHeight="260">
@@ -110,10 +122,6 @@
                                Text="Team ID 为纯数字，可从 Figma 团队页面 URL 中获取（如 figma.com/files/team/数字ID）"/>
                     <TextBlock x:Name="TeamIdError" Foreground="OrangeRed" FontSize="11" Margin="0,2,0,0"
                                Visibility="Collapsed" TextWrapping="Wrap"/>
-                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,2,0,0"
-                               Text="列表顺序决定搜索结果的 Team 展示优先级，排在前面的 Team 优先显示。"/>
-                    <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"
-                               Text="💡 独立 API Key：如果某个 Team 的文档同步不完整（如页面缺失），可能是因为当前 API Key 对该 Team 仅有查看权限。可以找该 Team 中有编辑权限的同事生成一个 Personal Access Token，填入「独立 API Key」列即可。留空则使用上方的全局 Key。已保存的 Key 不会因留空而被删除。"/>
                 </StackPanel>
                 <!-- Interval + Manual sync -->
                 <StackPanel Margin="0,0,0,16">
