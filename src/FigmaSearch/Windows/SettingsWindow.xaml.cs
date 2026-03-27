@@ -123,41 +123,61 @@ public partial class SettingsWindow : Window
 
     // ── Teams ────────────────────────────────────────────────────
 
+    /// <summary>
+    /// "＋ 添加一行" button: just inserts a blank TeamConfig row.
+    /// The user fills in the fields directly; LostFocus triggers validation and sync.
+    /// </summary>
     private void AddTeam_Click(object s, RoutedEventArgs e)
     {
-        var rawId = NewTeamId.Text.Trim();
-        var name  = NewTeamName.Text.Trim();
-        if (string.IsNullOrEmpty(rawId) || string.IsNullOrEmpty(name)) return;
+        _vm.Teams.Add(new TeamConfig { SortOrder = _vm.Teams.Count });
+        // Refresh PasswordBoxes so the new empty row gets initialized
+        Dispatcher.BeginInvoke(new Action(FillTeamApiKeyBoxes), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    /// <summary>
+    /// Called when any TextBox in a team row loses focus.
+    /// Validates the row's TeamId and, if newly valid, marks it as needing a sync trigger on Save.
+    /// Empty / invalid rows are silently ignored — they won't be saved or synced.
+    /// </summary>
+    private void TeamRow_LostFocus(object s, RoutedEventArgs e)
+    {
+        if (s is not FrameworkElement fe || fe.DataContext is not TeamConfig t) return;
+
+        var rawId = t.TeamId?.Trim() ?? "";
+        if (string.IsNullOrEmpty(rawId))
+        {
+            TeamIdError.Visibility = Visibility.Collapsed;
+            return;
+        }
 
         var error = TeamConfig.ValidateTeamId(rawId, out var cleanedId);
         if (error != null)
         {
             TeamIdError.Text = error;
             TeamIdError.Visibility = Visibility.Visible;
-            return;
         }
-
-        TeamIdError.Visibility = Visibility.Collapsed;
-        _vm.AddTeam(cleanedId, name);
-        NewTeamId.Text = "";
-        NewTeamName.Text = "";
-    }
-
-    private void NewTeam_TextChanged(object s, TextChangedEventArgs e)
-    {
-        if (AddTeamBtn == null) return;
-        AddTeamBtn.IsEnabled = !string.IsNullOrWhiteSpace(NewTeamId.Text)
-                             && !string.IsNullOrWhiteSpace(NewTeamName.Text);
-        // Clear previous validation error when user edits
-        if (TeamIdError != null) TeamIdError.Visibility = Visibility.Collapsed;
+        else
+        {
+            // Normalize the ID in-place (e.g. stripped URL → pure digits)
+            if (t.TeamId != cleanedId) t.TeamId = cleanedId;
+            TeamIdError.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void RemoveTeam_Click(object s, RoutedEventArgs e)
     {
         if (s is not FrameworkElement fe || fe.Tag is not TeamConfig t) return;
 
+        // If the row is completely empty, remove silently without confirmation
+        if (string.IsNullOrWhiteSpace(t.TeamId) && string.IsNullOrWhiteSpace(t.DisplayName))
+        {
+            _vm.RemoveTeam(t);
+            return;
+        }
+
+        var label = string.IsNullOrWhiteSpace(t.DisplayName) ? t.TeamId : t.DisplayName;
         var result = MessageBox.Show(
-            $"确定要删除 Team「{t.DisplayName}」吗？\n\n该操作会同步删除该 Team 下所有已拉取的文档和页面数据。",
+            $"确定要删除 Team「{label}」吗？\n\n该操作会同步删除该 Team 下所有已拉取的文档和页面数据。",
             "删除确认",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
@@ -391,7 +411,14 @@ public partial class SettingsWindow : Window
 
     private void Save_Click(object s, RoutedEventArgs e)
     {
-        // Snapshot old teams before saving to detect changes
+        // Remove empty/invalid rows before saving — they have no data to persist
+        var invalidRows = _vm.Teams
+            .Where(t => string.IsNullOrWhiteSpace(t.TeamId)
+                     || TeamConfig.ValidateTeamId(t.TeamId.Trim(), out _) != null)
+            .ToList();
+        foreach (var r in invalidRows) _vm.Teams.Remove(r);
+
+        // Snapshot old teams before saving to detect newly added ones
         var oldTeamIds = App.DB.GetTeams().Select(t => t.TeamId).ToHashSet();
         var newTeamIds = _vm.Teams.Select(t => t.TeamId).ToHashSet();
 

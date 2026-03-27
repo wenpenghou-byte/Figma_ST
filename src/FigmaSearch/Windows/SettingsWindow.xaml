@@ -61,30 +61,36 @@
                                 <TextBlock Grid.Column="2" Text="独立 API Key（可选）" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold" Margin="4,0,0,0"/>
                             </Grid>
                             <!-- Existing teams (editable rows) -->
-                            <ItemsControl x:Name="TeamsItemsControl" MinHeight="0" MaxHeight="240">
+                            <ItemsControl x:Name="TeamsItemsControl" MinHeight="0" MaxHeight="260">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Grid Margin="10,2,10,2">
+                                        <Grid Margin="8,3,8,3">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="76"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBox Grid.Column="0" Text="{Binding TeamId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                     Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6" Margin="0,0,4,0"/>
-                                            <TextBox Grid.Column="1" Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                     Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6" Margin="0,0,4,0"/>
+                                            <TextBox Grid.Column="0"
+                                                     Text="{Binding TeamId, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                                     Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6" Margin="0,0,4,0"
+                                                     Background="{StaticResource BgSecondary}"
+                                                     LostFocus="TeamRow_LostFocus"/>
+                                            <TextBox Grid.Column="1"
+                                                     Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                                     Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6" Margin="0,0,4,0"
+                                                     Background="{StaticResource BgSecondary}"
+                                                     LostFocus="TeamRow_LostFocus"/>
                                             <PasswordBox Grid.Column="2" Tag="{Binding}" Padding="6,6" FontSize="12" Margin="0,0,4,0"
                                                          Background="{StaticResource BgSecondary}" Foreground="{StaticResource FgPrimary}"
                                                          BorderBrush="Transparent" BorderThickness="0"
                                                          PasswordChanged="TeamApiKey_PasswordChanged"/>
                                             <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <Button Content="▲" Style="{StaticResource FlatButton}" Padding="6,4" FontSize="10"
+                                                <Button Content="▲" Style="{StaticResource FlatButton}" Padding="5,4" FontSize="10"
                                                         ToolTip="上移" Tag="{Binding}" Click="MoveTeamUp_Click"/>
-                                                <Button Content="▼" Style="{StaticResource FlatButton}" Padding="6,4" FontSize="10"
+                                                <Button Content="▼" Style="{StaticResource FlatButton}" Padding="5,4" FontSize="10"
                                                         ToolTip="下移" Tag="{Binding}" Click="MoveTeamDown_Click"/>
-                                                <Button Content="✕" Style="{StaticResource FlatButton}" Padding="6,4" FontSize="10"
+                                                <Button Content="✕" Style="{StaticResource FlatButton}" Padding="5,4" FontSize="10"
                                                         Foreground="{StaticResource ErrorRed}" ToolTip="删除"
                                                         Tag="{Binding}" Click="RemoveTeam_Click"/>
                                             </StackPanel>
@@ -92,25 +98,12 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <!-- Add new team row -->
-                            <Grid Margin="10,4,10,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="80"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBox x:Name="NewTeamId" Grid.Column="0" Margin="0,0,4,0"
-                                         Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6"
-                                         TextChanged="NewTeam_TextChanged"/>
-                                <TextBox x:Name="NewTeamName" Grid.Column="1" Margin="0,0,4,0"
-                                         Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6"
-                                         TextChanged="NewTeam_TextChanged"/>
-                                <Border Grid.Column="2" Margin="0,0,4,0"/>
-                                <Button x:Name="AddTeamBtn" Grid.Column="3" Content="＋ 添加"
-                                        Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
-                                        Padding="8,6" FontSize="11" IsEnabled="False" Click="AddTeam_Click"/>
-                            </Grid>
+                            <!-- Add row button -->
+                            <Button x:Name="AddTeamBtn" Content="＋ 添加一行" Margin="8,4,8,8"
+                                    Style="{StaticResource FlatButton}" Background="{StaticResource BgSecondary}"
+                                    Foreground="{StaticResource FgSecondary}" Padding="0,8"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                    FontSize="12" Click="AddTeam_Click"/>
                         </StackPanel>
                     </Border>
                     <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,4,0,0"

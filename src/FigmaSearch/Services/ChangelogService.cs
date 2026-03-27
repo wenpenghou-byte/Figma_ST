@@ -13,8 +13,7 @@ public static class ChangelogService
     /// </summary>
     public static readonly List<string> Notes = new()
     {
-        "优化：设置页面 Team IDs 改版——每行直接显示为可编辑输入框，无需「写入」按钮；删除和上下移动按钮直接在每行后方，无需先选中",
-        "优化：设置页面 Figma API Key 的帮助按钮（?）移至标题旁，与 Team IDs 风格一致",
+        "优化：设置页面 Team 列表改版——输入框直接显示深色底，所见即所得；「添加」按钮改为横跨整行的「＋ 添加一行」，点击新增空行后直接填写即可，无需再点写入",
     };
 
     /// <summary>
