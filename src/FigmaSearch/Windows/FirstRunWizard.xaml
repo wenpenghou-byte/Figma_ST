@@ -1,7 +1,7 @@
 ﻿<Window x:Class="FigmaSearch.Windows.FirstRunWizard"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="肥姑妈搜 - 初始配置" Width="500" Height="560"
+        Title="肥姑妈搜 - 初始配置" Width="720" Height="580"
         WindowStyle="SingleBorderWindow" ResizeMode="CanMinimize"
         ShowInTaskbar="True"
         WindowStartupLocation="CenterScreen"
@@ -21,69 +21,91 @@
         </TextBlock>
         <StackPanel Grid.Row="2">
             <!-- API Key -->
-            <TextBlock Text="Figma API Key" Foreground="{StaticResource FgSecondary}" FontSize="12" Margin="0,0,0,6"/>
-            <Grid Margin="0,0,0,4">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <PasswordBox x:Name="ApiKeyBox" Grid.Column="0" Background="{StaticResource BgTertiary}"
-                             Foreground="{StaticResource FgPrimary}" BorderBrush="{StaticResource BorderColor}"
-                             Padding="10,8" FontSize="13"/>
-                <Button Grid.Column="1" Content="?" Margin="6,0,0,0"
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <TextBlock Text="Figma API Key" Foreground="{StaticResource FgSecondary}" FontSize="12"/>
+                <Button Content="?" Margin="6,0,0,0"
                         Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
-                        Foreground="{StaticResource FgSecondary}" Padding="10,8"
+                        Foreground="{StaticResource FgSecondary}" Padding="6,1" FontSize="11"
                         ToolTip="如何获取 API Key？" Click="ApiKeyHelp_Click"/>
-            </Grid>
-            <TextBlock x:Name="ApiKeyHint" Text="请输入 API Key" Foreground="{StaticResource FgDisabled}"
-                       FontSize="11" Margin="0,0,0,20"/>
+            </StackPanel>
+            <PasswordBox x:Name="ApiKeyBox" Background="{StaticResource BgTertiary}"
+                         Foreground="{StaticResource FgPrimary}" BorderBrush="{StaticResource BorderColor}"
+                         Padding="10,8" FontSize="13" Margin="0,0,0,20"/>
             <!-- Teams -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                <TextBlock Text="Team ID + 显示名称" Foreground="{StaticResource FgSecondary}" FontSize="12"/>
+                <TextBlock Text="Team IDs" Foreground="{StaticResource FgSecondary}" FontSize="12"/>
                 <Button Content="?" Margin="6,0,0,0"
                         Style="{StaticResource FlatButton}" Background="{StaticResource BgTertiary}"
                         Foreground="{StaticResource FgSecondary}" Padding="6,1" FontSize="11"
                         ToolTip="如何获取 Team ID？" Click="TeamIdHelp_Click"/>
             </StackPanel>
-            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8">
+            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4"
+                    Background="{StaticResource BgTertiary}" Margin="0,0,0,8">
                 <StackPanel>
-                    <DataGrid x:Name="TeamsGrid" Background="{StaticResource BgTertiary}"
-                              Foreground="{StaticResource FgPrimary}" BorderThickness="0"
-                              RowBackground="{StaticResource BgTertiary}"
-                              AlternatingRowBackground="{StaticResource BgSecondary}"
-                              GridLinesVisibility="None" HeadersVisibility="Column"
-                              AutoGenerateColumns="False" CanUserAddRows="False"
-                              MinHeight="60" MaxHeight="120">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Team ID" Binding="{Binding TeamId}" Width="*"/>
-                            <DataGridTextColumn Header="显示名称" Binding="{Binding DisplayName}" Width="*"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                    <Grid Margin="8,6">
+                    <!-- Column headers -->
+                    <Grid Margin="8,8,8,4">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="76"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="NewTeamId" Grid.Column="0" Margin="0,0,4,0"
-                                 Style="{StaticResource SearchBox}" FontSize="13"
-                                 TextChanged="NewTeam_TextChanged"/>
-                        <TextBox x:Name="NewTeamName" Grid.Column="1" Margin="0,0,4,0"
-                                 Style="{StaticResource SearchBox}" FontSize="13"
-                                 TextChanged="NewTeam_TextChanged"/>
-                        <Button x:Name="AddTeamBtn" Grid.Column="2" Content="写入"
-                                Style="{StaticResource FlatButton}" Background="{StaticResource BgHover}"
-                                Padding="12,6" IsEnabled="False" Click="AddTeam_Click"/>
+                        <TextBlock Grid.Column="0" Text="Team ID" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="1" Text="显示名称" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold" Margin="4,0,0,0"/>
+                        <TextBlock Grid.Column="2" Text="独立 API Key（可选）" Foreground="{StaticResource FgSecondary}" FontSize="11" FontWeight="SemiBold" Margin="4,0,0,0"/>
                     </Grid>
+                    <!-- Team rows -->
+                    <ItemsControl x:Name="TeamsItemsControl" MinHeight="0" MaxHeight="200">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="8,3,8,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="76"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding TeamId, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                             Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6" Margin="0,0,4,0"
+                                             Background="{StaticResource BgSecondary}"
+                                             LostFocus="TeamRow_LostFocus"/>
+                                    <TextBox Grid.Column="1"
+                                             Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                             Style="{StaticResource SearchBox}" FontSize="12" Padding="6,6" Margin="0,0,4,0"
+                                             Background="{StaticResource BgSecondary}"/>
+                                    <PasswordBox Grid.Column="2" Tag="{Binding}" Padding="6,6" FontSize="12" Margin="0,0,4,0"
+                                                 Background="{StaticResource BgSecondary}" Foreground="{StaticResource FgPrimary}"
+                                                 BorderBrush="Transparent" BorderThickness="0"
+                                                 PasswordChanged="TeamApiKey_PasswordChanged"/>
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Button Content="▲" Style="{StaticResource FlatButton}" Padding="5,4" FontSize="10"
+                                                ToolTip="上移" Tag="{Binding}" Click="MoveTeamUp_Click"/>
+                                        <Button Content="▼" Style="{StaticResource FlatButton}" Padding="5,4" FontSize="10"
+                                                ToolTip="下移" Tag="{Binding}" Click="MoveTeamDown_Click"/>
+                                        <Button Content="✕" Style="{StaticResource FlatButton}" Padding="5,4" FontSize="10"
+                                                Foreground="{StaticResource ErrorRed}" ToolTip="删除"
+                                                Tag="{Binding}" Click="RemoveTeam_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- Add row button -->
+                    <Button x:Name="AddTeamBtn" Content="＋ 添加一行" Margin="8,4,8,8"
+                            Style="{StaticResource FlatButton}" Background="{StaticResource BgSecondary}"
+                            Foreground="{StaticResource FgSecondary}" Padding="0,8"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            FontSize="12" Click="AddTeam_Click"/>
                 </StackPanel>
             </Border>
-            <TextBlock x:Name="TeamIdHint" Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,0,0,2"
-                       Text="Team ID 为纯数字，可从 Figma 团队页面 URL 中获取（如 figma.com/files/team/数字ID）" TextWrapping="Wrap"/>
-            <TextBlock x:Name="TeamIdError" Foreground="OrangeRed" FontSize="11" Margin="0,0,0,8"
+            <TextBlock x:Name="TeamIdError" Foreground="OrangeRed" FontSize="11" Margin="0,0,0,4"
                        Visibility="Collapsed" TextWrapping="Wrap"/>
+            <TextBlock Foreground="{StaticResource FgDisabled}" FontSize="11" Margin="0,0,0,8" TextWrapping="Wrap"
+                       Text="Team ID 为纯数字，可从 Figma 团队页面 URL 中获取（如 figma.com/files/team/数字ID）"/>
             <!-- Startup checkbox -->
             <CheckBox x:Name="StartupCheck" Content="开机自动启动"
-                      Foreground="{StaticResource FgPrimary}" IsChecked="True" Margin="0,8,0,0"/>
+                      Foreground="{StaticResource FgPrimary}" IsChecked="True" Margin="0,4,0,0"/>
         </StackPanel>
         <!-- Bottom -->
         <StackPanel Grid.Row="3" Margin="0,20,0,0">
