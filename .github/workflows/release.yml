@@ -71,3 +71,19 @@ jobs:
           name: FigmaSearch_Setup
           path: installer/dist/FigmaSearch_Setup.exe
           retention-days: 3
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/dist/FigmaSearch_Setup.exe
+          body: |
+            ## v1.3.37 更新内容
+
+            ### 🔄 更新源迁移至内网 GitLab
+
+            - 更新检测和安装包下载现在指向内网 GitLab，确保数据安全
+            - 后续所有版本更新将通过内网发布，请通过内网获取最新版本
+
+            > 这是最后一个通过 GitHub 分发的版本。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
